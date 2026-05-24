@@ -4,11 +4,15 @@ module Core.Types
   , UImm5(..)
   , AqRl(..), RoundingMode(..), FenceMode(..)
   , PrivilegeLevel(..)
-  -- Register aliases
+  -- Register aliases (ABI names)
   , x0, ra, sp, gp, tp, t0, t1, t2, fp, s1
   , a0, a1, a2, a3, a4, a5, a6, a7
   , s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
   , t3, t4, t5, t6
+  -- Register aliases (numeric names)
+  , x1, x2, x3, x4, x5, x6, x7, x8, x9, x10
+  , x11, x12, x13, x14, x15, x16, x17, x18, x19, x20
+  , x21, x22, x23, x24, x25, x26, x27, x28, x29, x30, x31
   ) where
 
 import Data.Word  (Word8, Word16)
@@ -66,3 +70,19 @@ s5  = Register 21;  s6  = Register 22;  s7  = Register 23
 s8  = Register 24;  s9  = Register 25;  s10 = Register 26
 s11 = Register 27;  t3  = Register 28;  t4  = Register 29
 t5  = Register 30;  t6  = Register 31
+
+-- Numeric aliases x1..x31 (same physical registers, different names)
+x1, x2, x3, x4, x5, x6, x7, x8, x9, x10 :: Register
+x11, x12, x13, x14, x15, x16, x17, x18, x19, x20 :: Register
+x21, x22, x23, x24, x25, x26, x27, x28, x29, x30, x31 :: Register
+x1  = Register  1;  x2  = Register  2;  x3  = Register  3
+x4  = Register  4;  x5  = Register  5;  x6  = Register  6
+x7  = Register  7;  x8  = Register  8;  x9  = Register  9
+x10 = Register 10;  x11 = Register 11;  x12 = Register 12
+x13 = Register 13;  x14 = Register 14;  x15 = Register 15
+x16 = Register 16;  x17 = Register 17;  x18 = Register 18
+x19 = Register 19;  x20 = Register 20;  x21 = Register 21
+x22 = Register 22;  x23 = Register 23;  x24 = Register 24
+x25 = Register 25;  x26 = Register 26;  x27 = Register 27
+x28 = Register 28;  x29 = Register 29;  x30 = Register 30
+x31 = Register 31
