@@ -1,0 +1,1 @@
+module Coverage.Types where
