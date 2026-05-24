@@ -1,1 +1,159 @@
-module Core.Encode where
+module Core.Encode (encode) where
+
+import Core.Types
+import Core.Instruction
+import Data.Bits  (shiftL, shiftR, (.|.), (.&.))
+import Data.Word  (Word32)
+
+buildR :: Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> Word32
+buildR opcode rd funct3 rs1 rs2 funct7 =
+  (funct7 `shiftL` 25) .|. (rs2 `shiftL` 20) .|. (rs1 `shiftL` 15)
+  .|. (funct3 `shiftL` 12) .|. (rd `shiftL` 7) .|. opcode
+
+buildI :: Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> Word32
+buildI opcode rd funct3 rs1 imm12 =
+  ((imm12 .&. 0xFFF) `shiftL` 20) .|. (rs1 `shiftL` 15)
+  .|. (funct3 `shiftL` 12) .|. (rd `shiftL` 7) .|. opcode
+
+-- For RV64I shift-immediates: 6-bit shamt + 6-bit funct6 discriminator
+buildIShift :: Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> Word32
+buildIShift opcode rd funct3 rs1 shamt funct6 =
+  (funct6 `shiftL` 26) .|. ((shamt .&. 0x3F) `shiftL` 20)
+  .|. (rs1 `shiftL` 15) .|. (funct3 `shiftL` 12) .|. (rd `shiftL` 7) .|. opcode
+
+buildS :: Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> Word32
+buildS opcode funct3 rs1 rs2 imm12 =
+  let i = imm12 .&. 0xFFF
+  in  ((i `shiftR` 5) .&. 0x7F) `shiftL` 25 .|. (rs2 `shiftL` 20)
+      .|. (rs1 `shiftL` 15) .|. (funct3 `shiftL` 12)
+      .|. (i .&. 0x1F) `shiftL` 7 .|. opcode
+
+buildB :: Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> Word32
+buildB opcode funct3 rs1 rs2 imm13 =
+  let i = imm13 .&. 0x1FFF
+  in  ((i `shiftR` 12) .&. 0x1) `shiftL` 31
+      .|. ((i `shiftR` 5) .&. 0x3F) `shiftL` 25
+      .|. (rs2 `shiftL` 20) .|. (rs1 `shiftL` 15)
+      .|. (funct3 `shiftL` 12)
+      .|. ((i `shiftR` 1) .&. 0xF) `shiftL` 8
+      .|. ((i `shiftR` 11) .&. 0x1) `shiftL` 7
+      .|. opcode
+
+buildU :: Word32 -> Word32 -> Word32 -> Word32
+buildU opcode rd imm20 =
+  ((imm20 .&. 0xFFFFF) `shiftL` 12) .|. (rd `shiftL` 7) .|. opcode
+
+buildJ :: Word32 -> Word32 -> Word32 -> Word32
+buildJ opcode rd imm21 =
+  let i = imm21 .&. 0x1FFFFF
+  in  ((i `shiftR` 20) .&. 0x1) `shiftL` 31
+      .|. ((i `shiftR` 1) .&. 0x3FF) `shiftL` 21
+      .|. ((i `shiftR` 11) .&. 0x1) `shiftL` 20
+      .|. ((i `shiftR` 12) .&. 0xFF) `shiftL` 12
+      .|. (rd `shiftL` 7) .|. opcode
+
+r :: Register -> Word32
+r (Register x) = fromIntegral x
+
+csr :: CSRAddr -> Word32
+csr (CSRAddr x) = fromIntegral x
+
+i12 :: Imm12 -> Word32
+i12 (Imm12 x) = fromIntegral x
+
+i13 :: Imm13 -> Word32
+i13 (Imm13 x) = fromIntegral x
+
+i20 :: Imm20 -> Word32
+i20 (Imm20 x) = fromIntegral x
+
+i21 :: Imm21 -> Word32
+i21 (Imm21 x) = fromIntegral x
+
+u5 :: UImm5 -> Word32
+u5 (UImm5 x) = fromIntegral x
+
+u6 :: UImm6 -> Word32
+u6 (UImm6 x) = fromIntegral x
+
+encode :: Instruction -> Word32
+encode = \case
+  ADD  rd rs1 rs2 -> buildR 0x33 (r rd) 0x0 (r rs1) (r rs2) 0x00
+  SUB  rd rs1 rs2 -> buildR 0x33 (r rd) 0x0 (r rs1) (r rs2) 0x20
+  ADDI rd rs1 imm -> buildI 0x13 (r rd) 0x0 (r rs1) (i12 imm)
+  ADDIW rd rs1 imm -> buildI 0x1B (r rd) 0x0 (r rs1) (i12 imm)
+  ADDW rd rs1 rs2 -> buildR 0x3B (r rd) 0x0 (r rs1) (r rs2) 0x00
+  SUBW rd rs1 rs2 -> buildR 0x3B (r rd) 0x0 (r rs1) (r rs2) 0x20
+  AND  rd rs1 rs2 -> buildR 0x33 (r rd) 0x7 (r rs1) (r rs2) 0x00
+  OR   rd rs1 rs2 -> buildR 0x33 (r rd) 0x6 (r rs1) (r rs2) 0x00
+  XOR  rd rs1 rs2 -> buildR 0x33 (r rd) 0x4 (r rs1) (r rs2) 0x00
+  ANDI rd rs1 imm -> buildI 0x13 (r rd) 0x7 (r rs1) (i12 imm)
+  ORI  rd rs1 imm -> buildI 0x13 (r rd) 0x6 (r rs1) (i12 imm)
+  XORI rd rs1 imm -> buildI 0x13 (r rd) 0x4 (r rs1) (i12 imm)
+  SLL  rd rs1 rs2 -> buildR 0x33 (r rd) 0x1 (r rs1) (r rs2) 0x00
+  SRL  rd rs1 rs2 -> buildR 0x33 (r rd) 0x5 (r rs1) (r rs2) 0x00
+  SRA  rd rs1 rs2 -> buildR 0x33 (r rd) 0x5 (r rs1) (r rs2) 0x20
+  SLLI rd rs1 sh  -> buildIShift 0x13 (r rd) 0x1 (r rs1) (u6 sh) 0x00
+  SRLI rd rs1 sh  -> buildIShift 0x13 (r rd) 0x5 (r rs1) (u6 sh) 0x00
+  SRAI rd rs1 sh  -> buildIShift 0x13 (r rd) 0x5 (r rs1) (u6 sh) 0x10
+  SLLIW rd rs1 sh -> buildR 0x1B (r rd) 0x1 (r rs1) (u5 sh) 0x00
+  SRLIW rd rs1 sh -> buildR 0x1B (r rd) 0x5 (r rs1) (u5 sh) 0x00
+  SRAIW rd rs1 sh -> buildR 0x1B (r rd) 0x5 (r rs1) (u5 sh) 0x20
+  SLLW rd rs1 rs2 -> buildR 0x3B (r rd) 0x1 (r rs1) (r rs2) 0x00
+  SRLW rd rs1 rs2 -> buildR 0x3B (r rd) 0x5 (r rs1) (r rs2) 0x00
+  SRAW rd rs1 rs2 -> buildR 0x3B (r rd) 0x5 (r rs1) (r rs2) 0x20
+  SLT  rd rs1 rs2 -> buildR 0x33 (r rd) 0x2 (r rs1) (r rs2) 0x00
+  SLTU rd rs1 rs2 -> buildR 0x33 (r rd) 0x3 (r rs1) (r rs2) 0x00
+  SLTI  rd rs1 imm -> buildI 0x13 (r rd) 0x2 (r rs1) (i12 imm)
+  SLTIU rd rs1 imm -> buildI 0x13 (r rd) 0x3 (r rs1) (i12 imm)
+  LUI   rd imm -> buildU 0x37 (r rd) (i20 imm)
+  AUIPC rd imm -> buildU 0x17 (r rd) (i20 imm)
+  LB  rd rs1 imm -> buildI 0x03 (r rd) 0x0 (r rs1) (i12 imm)
+  LH  rd rs1 imm -> buildI 0x03 (r rd) 0x1 (r rs1) (i12 imm)
+  LW  rd rs1 imm -> buildI 0x03 (r rd) 0x2 (r rs1) (i12 imm)
+  LD  rd rs1 imm -> buildI 0x03 (r rd) 0x3 (r rs1) (i12 imm)
+  LBU rd rs1 imm -> buildI 0x03 (r rd) 0x4 (r rs1) (i12 imm)
+  LHU rd rs1 imm -> buildI 0x03 (r rd) 0x5 (r rs1) (i12 imm)
+  LWU rd rs1 imm -> buildI 0x03 (r rd) 0x6 (r rs1) (i12 imm)
+  SB rs2 rs1 imm -> buildS 0x23 0x0 (r rs1) (r rs2) (i12 imm)
+  SH rs2 rs1 imm -> buildS 0x23 0x1 (r rs1) (r rs2) (i12 imm)
+  SW rs2 rs1 imm -> buildS 0x23 0x2 (r rs1) (r rs2) (i12 imm)
+  SD rs2 rs1 imm -> buildS 0x23 0x3 (r rs1) (r rs2) (i12 imm)
+  BEQ  rs1 rs2 imm -> buildB 0x63 0x0 (r rs1) (r rs2) (i13 imm)
+  BNE  rs1 rs2 imm -> buildB 0x63 0x1 (r rs1) (r rs2) (i13 imm)
+  BLT  rs1 rs2 imm -> buildB 0x63 0x4 (r rs1) (r rs2) (i13 imm)
+  BGE  rs1 rs2 imm -> buildB 0x63 0x5 (r rs1) (r rs2) (i13 imm)
+  BLTU rs1 rs2 imm -> buildB 0x63 0x6 (r rs1) (r rs2) (i13 imm)
+  BGEU rs1 rs2 imm -> buildB 0x63 0x7 (r rs1) (r rs2) (i13 imm)
+  JAL  rd imm     -> buildJ 0x6F (r rd) (i21 imm)
+  JALR rd rs1 imm -> buildI 0x67 (r rd) 0x0 (r rs1) (i12 imm)
+  ECALL   -> buildI 0x73 0 0 0 0
+  EBREAK  -> buildI 0x73 0 0 0 1
+  FENCE_I -> buildI 0x0F 0 0x1 0 0
+  FENCE pre suc ->
+    let encFm fm = (if fenceI fm then 8 else 0) .|. (if fenceO fm then 4 else 0)
+                   .|. (if fenceR fm then 2 else 0) .|. (if fenceW fm then 1 else 0)
+    in  (encFm pre `shiftL` 24) .|. (encFm suc `shiftL` 20) .|. 0x0F
+  CSRRW  rd caddr rs1 -> buildI 0x73 (r rd) 0x1 (r rs1) (csr caddr)
+  CSRRS  rd caddr rs1 -> buildI 0x73 (r rd) 0x2 (r rs1) (csr caddr)
+  CSRRC  rd caddr rs1 -> buildI 0x73 (r rd) 0x3 (r rs1) (csr caddr)
+  CSRRWI rd caddr imm -> buildI 0x73 (r rd) 0x5 (u5 imm) (csr caddr)
+  CSRRSI rd caddr imm -> buildI 0x73 (r rd) 0x6 (u5 imm) (csr caddr)
+  CSRRCI rd caddr imm -> buildI 0x73 (r rd) 0x7 (u5 imm) (csr caddr)
+  MUL    rd rs1 rs2 -> buildR 0x33 (r rd) 0x0 (r rs1) (r rs2) 0x01
+  MULH   rd rs1 rs2 -> buildR 0x33 (r rd) 0x1 (r rs1) (r rs2) 0x01
+  MULHSU rd rs1 rs2 -> buildR 0x33 (r rd) 0x2 (r rs1) (r rs2) 0x01
+  MULHU  rd rs1 rs2 -> buildR 0x33 (r rd) 0x3 (r rs1) (r rs2) 0x01
+  DIV    rd rs1 rs2 -> buildR 0x33 (r rd) 0x4 (r rs1) (r rs2) 0x01
+  DIVU   rd rs1 rs2 -> buildR 0x33 (r rd) 0x5 (r rs1) (r rs2) 0x01
+  REM    rd rs1 rs2 -> buildR 0x33 (r rd) 0x6 (r rs1) (r rs2) 0x01
+  REMU   rd rs1 rs2 -> buildR 0x33 (r rd) 0x7 (r rs1) (r rs2) 0x01
+  MULW   rd rs1 rs2 -> buildR 0x3B (r rd) 0x0 (r rs1) (r rs2) 0x01
+  DIVW   rd rs1 rs2 -> buildR 0x3B (r rd) 0x4 (r rs1) (r rs2) 0x01
+  DIVUW  rd rs1 rs2 -> buildR 0x3B (r rd) 0x5 (r rs1) (r rs2) 0x01
+  REMW   rd rs1 rs2 -> buildR 0x3B (r rd) 0x6 (r rs1) (r rs2) 0x01
+  REMUW  rd rs1 rs2 -> buildR 0x3B (r rd) 0x7 (r rs1) (r rs2) 0x01
+  MRET -> buildR 0x73 0 0 0 2 0x18
+  SRET -> buildR 0x73 0 0 0 2 0x08
+  WFI  -> buildR 0x73 0 0 0 5 0x08
+  SFENCE_VMA rs1 rs2 -> buildR 0x73 0 0 (r rs1) (r rs2) 0x09
