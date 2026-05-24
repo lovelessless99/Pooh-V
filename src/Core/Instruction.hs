@@ -146,7 +146,7 @@ instrFormat = \case
   JALR{} -> IFormat; CSRRW{} -> IFormat; CSRRS{} -> IFormat; CSRRC{} -> IFormat
   CSRRWI{} -> IFormat; CSRRSI{} -> IFormat; CSRRCI{} -> IFormat
   ECALL -> IFormat; EBREAK -> IFormat; FENCE{} -> IFormat; FENCE_I -> IFormat
-  MRET -> IFormat; SRET -> IFormat; WFI -> IFormat; SFENCE_VMA{} -> RFormat
+  MRET -> RFormat; SRET -> RFormat; WFI -> RFormat; SFENCE_VMA{} -> RFormat
   SB{} -> SFormat; SH{} -> SFormat; SW{} -> SFormat; SD{} -> SFormat
   BEQ{} -> BFormat; BNE{} -> BFormat; BLT{} -> BFormat; BGE{} -> BFormat
   BLTU{} -> BFormat; BGEU{} -> BFormat

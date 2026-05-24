@@ -131,6 +131,7 @@ encode = \case
   EBREAK  -> buildI 0x73 0 0 0 1
   FENCE_I -> buildI 0x0F 0 0x1 0 0
   FENCE pre suc ->
+    -- bits[31:28]=fm (implicit 0000); bits[27:24]=pred; bits[23:20]=succ
     let encFm fm = (if fenceI fm then 8 else 0) .|. (if fenceO fm then 4 else 0)
                    .|. (if fenceR fm then 2 else 0) .|. (if fenceW fm then 1 else 0)
     in  (encFm pre `shiftL` 24) .|. (encFm suc `shiftL` 20) .|. 0x0F
