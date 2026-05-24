@@ -43,8 +43,10 @@ signExt13 w =
                  .|. (b10_5 `shiftL` 5) .|. (b4_1 `shiftL` 1)) :: Int16
   in  if testBit raw 12 then raw - 0x2000 else raw
 
-signExt20 :: Word32 -> Int32
-signExt20 w = fromIntegral (field w 31 12)
+-- U-type immediate: unsigned 20-bit value, stored as non-negative Int32.
+-- Not truly sign-extended — Imm20 values are always in [0, 0xFFFFF].
+extractImm20 :: Word32 -> Int32
+extractImm20 w = fromIntegral (field w 31 12)
 
 signExt21 :: Word32 -> Int32
 signExt21 w =
@@ -78,8 +80,8 @@ decode w = case opcode w of
   0x03 -> decodeLoad w
   0x23 -> decodeStore w
   0x63 -> decodeBranch w
-  0x37 -> Right $ LUI   (mkReg (rd' w)) (Imm20 (signExt20 w))
-  0x17 -> Right $ AUIPC (mkReg (rd' w)) (Imm20 (signExt20 w))
+  0x37 -> Right $ LUI   (mkReg (rd' w)) (Imm20 (extractImm20 w))
+  0x17 -> Right $ AUIPC (mkReg (rd' w)) (Imm20 (extractImm20 w))
   0x6F -> Right $ JAL   (mkReg (rd' w)) (Imm21 (signExt21 w))
   0x67 -> Right $ JALR  (mkReg (rd' w)) (mkReg (rs1' w)) (Imm12 (signExt12 (field w 31 20)))
   0x73 -> decodeSystem w
