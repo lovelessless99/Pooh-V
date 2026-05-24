@@ -39,6 +39,8 @@ data AqRl
 data RoundingMode = RNE | RTZ | RDN | RUP | RMM | DYN
   deriving (Show, Eq, Ord, Enum, Bounded, Generic)
 
+-- Ord is Bool-lexicographic (fenceI > fenceO > fenceR > fenceW), not the
+-- 4-bit numeric encoding. Use Core.Encode.encodeFenceMode for the bit value.
 data FenceMode = FenceMode
   { fenceI :: Bool
   , fenceO :: Bool
