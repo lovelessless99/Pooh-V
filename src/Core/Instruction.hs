@@ -45,9 +45,9 @@ data Instruction
   | SLL    Register Register Register
   | SRL    Register Register Register
   | SRA    Register Register Register
-  | SLLI   Register Register UImm5
-  | SRLI   Register Register UImm5
-  | SRAI   Register Register UImm5
+  | SLLI   Register Register UImm6
+  | SRLI   Register Register UImm6
+  | SRAI   Register Register UImm6
   | SLLIW  Register Register UImm5
   | SRLIW  Register Register UImm5
   | SRAIW  Register Register UImm5
@@ -115,7 +115,7 @@ data Instruction
   | MRET
   | SRET
   | WFI
-  | SFENCE_VMA Register Register
+  | SFENCE_VMA Register Register      -- rs1=vaddr, rs2=asid
   deriving (Show, Eq, Ord, Generic)
 
 instrExtension :: Instruction -> Extension

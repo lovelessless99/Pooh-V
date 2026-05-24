@@ -1,7 +1,7 @@
 module Core.Types
   ( Register(..), FPRegister(..), CSRAddr(..)
   , Imm12(..), Imm13(..), Imm20(..), Imm21(..), Imm6(..)
-  , UImm5(..)
+  , UImm5(..), UImm6(..)
   , AqRl(..), RoundingMode(..), FenceMode(..)
   , PrivilegeLevel(..)
   -- Register aliases (ABI names)
@@ -32,6 +32,7 @@ newtype Imm20  = Imm20  { unImm20  :: Int32 } deriving (Show, Eq, Ord, Generic)
 newtype Imm21  = Imm21  { unImm21  :: Int32 } deriving (Show, Eq, Ord, Generic)
 newtype Imm6   = Imm6   { unImm6   :: Int8  } deriving (Show, Eq, Ord, Generic)
 newtype UImm5  = UImm5  { unUImm5  :: Word8 } deriving (Show, Eq, Ord, Generic)
+newtype UImm6  = UImm6  { unUImm6  :: Word8 } deriving (Show, Eq, Ord, Generic)
 
 data AqRl
   = AqRlNone
