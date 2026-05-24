@@ -45,9 +45,9 @@ csrAddr = CSRAddr . \case
 
 data CSRAccess = CSRAccess
   { readPriv  :: PrivilegeLevel
-  , writePriv :: PrivilegeLevel
+  , writePriv :: PrivilegeLevel  -- ignored when readOnly = True
   , readOnly  :: Bool
-  }
+  } deriving (Show, Eq)
 
 csrAccessRules :: CSR -> CSRAccess
 csrAccessRules = \case
@@ -79,9 +79,9 @@ csrAccessRules = \case
   Stval      -> CSRAccess Supervisor Supervisor False
   Sip        -> CSRAccess Supervisor Supervisor False
   Satp       -> CSRAccess Supervisor Supervisor False
-  Cycle      -> CSRAccess User User True
-  Time       -> CSRAccess User User True
-  Instret    -> CSRAccess User User True
+  Cycle      -> CSRAccess User Machine True
+  Time       -> CSRAccess User Machine True
+  Instret    -> CSRAccess User Machine True
   Mcycle     -> CSRAccess Machine Machine False
   Minstret   -> CSRAccess Machine Machine False
   Fflags     -> CSRAccess User User False
