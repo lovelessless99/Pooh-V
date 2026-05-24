@@ -5,6 +5,7 @@ import Test.Tasty.HUnit
 import Core.Types
 import Core.Instruction
 import Core.Encode
+import Core.CSR
 import Data.Word (Word32)
 
 tests :: TestTree
@@ -12,6 +13,7 @@ tests = testGroup "Core"
   [ typeTests
   , instrTests
   , encodeTests
+  , csrTests
   ]
 
 typeTests :: TestTree
@@ -65,3 +67,17 @@ encodeTests = testGroup "Core.Encode"
   , testCase "CSRRW x1,mstatus,x0 = 0x300010F3" $
       encode (CSRRW (Register 1) (CSRAddr 0x300) (Register 0)) @?= 0x300010F3
   ]
+
+csrTests :: TestTree
+csrTests = testGroup "Core.CSR"
+  [ testCase "mstatus address is 0x300" $
+      csrAddr Mstatus @?= CSRAddr 0x300
+  , testCase "all CSR addresses are unique" $
+      let addrs = map csrAddr [minBound..maxBound]
+      in  length addrs @?= length (nub addrs)
+  , testCase "Mstatus requires Machine privilege to write" $
+      writePriv (csrAccessRules Mstatus) @?= Machine
+  , testCase "Cycle is read-only" $
+      readOnly (csrAccessRules Cycle) @?= True
+  ]
+  where nub [] = []; nub (x:xs) = x : nub (filter (/=x) xs)
