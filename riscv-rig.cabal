@@ -92,3 +92,4 @@ test-suite riscv-rig-test
     , tasty-hunit    >= 0.10
     , containers     >= 0.6
     , bytestring     >= 0.11
+    , sbv            >= 10.2
