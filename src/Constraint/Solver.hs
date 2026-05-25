@@ -52,7 +52,9 @@ checkFeasibility cs = do
   result <- sat (buildQuery cs)
   return $ if modelExists result
     then Feasible
-    else Infeasible (map cname (constraints cs))
+    else case result of
+      SatResult (Unknown _ _)      -> FeasibilityUnknown "solver returned unknown"
+      _                            -> Infeasible (map cname (constraints cs))
 
 estimateDensity :: ConstraintSet -> Int -> IO Density
 estimateDensity cs n = do
@@ -74,9 +76,13 @@ collectN cs remaining acc = do
     Nothing -> return acc
     Just p  ->
       let blockClause prms =
-            sNot $ symRd prms .== literal (ipRd p)
-              .&& symRs1 prms .== literal (ipRs1 p)
-              .&& symImm prms .== literal (ipImm p)
+            sNot $   symOpcode prms .== literal (ipOpcode p)
+                 .&& symRd     prms .== literal (ipRd     p)
+                 .&& symRs1    prms .== literal (ipRs1    p)
+                 .&& symRs2    prms .== literal (ipRs2    p)
+                 .&& symFunct3 prms .== literal (ipFunct3 p)
+                 .&& symFunct7 prms .== literal (ipFunct7 p)
+                 .&& symImm    prms .== literal (ipImm    p)
           blocked = ConstraintSet
             (ConstraintDef "block" [] "" [] blockClause : constraints cs)
       in  collectN blocked (remaining - 1) (p : acc)
