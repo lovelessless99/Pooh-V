@@ -94,3 +94,4 @@ test-suite riscv-rig-test
     , bytestring     >= 0.11
     , sbv            >= 10.2
     , stm            >= 2.5
+    , text           >= 2.0
