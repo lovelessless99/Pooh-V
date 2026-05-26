@@ -98,3 +98,18 @@ test-suite riscv-rig-test
     , sbv            >= 10.2
     , stm            >= 2.5
     , text           >= 2.0
+
+test-suite riscv-rig-integration
+  import:          common-options
+  type:            exitcode-stdio-1.0
+  hs-source-dirs:  test
+  main-is:         IntegrationSpec.hs
+  other-modules:
+    Test.Integration.Smoke
+  build-depends:
+      base           >= 4.17 && < 5
+    , riscv-rig
+    , tasty          >= 1.4
+    , tasty-hunit    >= 0.10
+    , process        >= 1.6
+    , temporary      >= 1.3
