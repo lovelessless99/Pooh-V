@@ -93,3 +93,4 @@ test-suite riscv-rig-test
     , containers     >= 0.6
     , bytestring     >= 0.11
     , sbv            >= 10.2
+    , stm            >= 2.5
