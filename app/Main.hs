@@ -1,3 +1,7 @@
-module Main where
+module Main (main) where
+
+import CLI.Options (parseOptions)
+import CLI.Runner  (runCommand)
+
 main :: IO ()
-main = return ()
+main = parseOptions >>= runCommand
