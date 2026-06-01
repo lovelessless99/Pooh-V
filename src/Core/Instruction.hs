@@ -145,6 +145,78 @@ data Instruction
   | AMOMAX_D  Register Register Register AqRl
   | AMOMINU_D Register Register Register AqRl
   | AMOMAXU_D Register Register Register AqRl
+  -- ── RV64F: Loads / Stores ───────────────────────────────────────
+  | FLW   FPRegister Register Imm12      -- rd rs1 offset
+  | FSW   FPRegister Register Imm12      -- rs2 rs1 offset (rs2=data, rs1=base)
+  -- ── RV64F: Fused Multiply-Add (R4 format) ──────────────────────
+  | FMADD_S  FPRegister FPRegister FPRegister FPRegister RoundingMode
+  | FMSUB_S  FPRegister FPRegister FPRegister FPRegister RoundingMode
+  | FNMADD_S FPRegister FPRegister FPRegister FPRegister RoundingMode
+  | FNMSUB_S FPRegister FPRegister FPRegister FPRegister RoundingMode
+  -- ── RV64F: 3-Operand (OP-FP) ───────────────────────────────────
+  | FADD_S   FPRegister FPRegister FPRegister RoundingMode
+  | FSUB_S   FPRegister FPRegister FPRegister RoundingMode
+  | FMUL_S   FPRegister FPRegister FPRegister RoundingMode
+  | FDIV_S   FPRegister FPRegister FPRegister RoundingMode
+  | FSQRT_S  FPRegister FPRegister RoundingMode
+  | FSGNJ_S  FPRegister FPRegister FPRegister
+  | FSGNJN_S FPRegister FPRegister FPRegister
+  | FSGNJX_S FPRegister FPRegister FPRegister
+  | FMIN_S   FPRegister FPRegister FPRegister
+  | FMAX_S   FPRegister FPRegister FPRegister
+  -- ── RV64F: Conversions ─────────────────────────────────────────
+  | FCVT_W_S  Register FPRegister RoundingMode
+  | FCVT_WU_S Register FPRegister RoundingMode
+  | FCVT_L_S  Register FPRegister RoundingMode
+  | FCVT_LU_S Register FPRegister RoundingMode
+  | FCVT_S_W  FPRegister Register RoundingMode
+  | FCVT_S_WU FPRegister Register RoundingMode
+  | FCVT_S_L  FPRegister Register RoundingMode
+  | FCVT_S_LU FPRegister Register RoundingMode
+  -- ── RV64F: Move / Compare / Classify ───────────────────────────
+  | FMV_X_W   Register FPRegister
+  | FMV_W_X   FPRegister Register
+  | FEQ_S     Register FPRegister FPRegister
+  | FLT_S     Register FPRegister FPRegister
+  | FLE_S     Register FPRegister FPRegister
+  | FCLASS_S  Register FPRegister
+  -- ── RV64D: Loads / Stores ───────────────────────────────────────
+  | FLD   FPRegister Register Imm12
+  | FSD   FPRegister Register Imm12
+  -- ── RV64D: Fused Multiply-Add ──────────────────────────────────
+  | FMADD_D  FPRegister FPRegister FPRegister FPRegister RoundingMode
+  | FMSUB_D  FPRegister FPRegister FPRegister FPRegister RoundingMode
+  | FNMADD_D FPRegister FPRegister FPRegister FPRegister RoundingMode
+  | FNMSUB_D FPRegister FPRegister FPRegister FPRegister RoundingMode
+  -- ── RV64D: 3-Operand ───────────────────────────────────────────
+  | FADD_D   FPRegister FPRegister FPRegister RoundingMode
+  | FSUB_D   FPRegister FPRegister FPRegister RoundingMode
+  | FMUL_D   FPRegister FPRegister FPRegister RoundingMode
+  | FDIV_D   FPRegister FPRegister FPRegister RoundingMode
+  | FSQRT_D  FPRegister FPRegister RoundingMode
+  | FSGNJ_D  FPRegister FPRegister FPRegister
+  | FSGNJN_D FPRegister FPRegister FPRegister
+  | FSGNJX_D FPRegister FPRegister FPRegister
+  | FMIN_D   FPRegister FPRegister FPRegister
+  | FMAX_D   FPRegister FPRegister FPRegister
+  -- ── RV64D: Conversions ─────────────────────────────────────────
+  | FCVT_S_D FPRegister FPRegister RoundingMode
+  | FCVT_D_S FPRegister FPRegister RoundingMode
+  | FCVT_W_D  Register FPRegister RoundingMode
+  | FCVT_WU_D Register FPRegister RoundingMode
+  | FCVT_L_D  Register FPRegister RoundingMode
+  | FCVT_LU_D Register FPRegister RoundingMode
+  | FCVT_D_W  FPRegister Register RoundingMode
+  | FCVT_D_WU FPRegister Register RoundingMode
+  | FCVT_D_L  FPRegister Register RoundingMode
+  | FCVT_D_LU FPRegister Register RoundingMode
+  -- ── RV64D: Move / Compare / Classify ───────────────────────────
+  | FMV_X_D   Register FPRegister
+  | FMV_D_X   FPRegister Register
+  | FEQ_D     Register FPRegister FPRegister
+  | FLT_D     Register FPRegister FPRegister
+  | FLE_D     Register FPRegister FPRegister
+  | FCLASS_D  Register FPRegister
   deriving (Show, Eq, Ord, Generic)
 
 instrExtension :: Instruction -> Extension
@@ -162,6 +234,27 @@ instrExtension instr = case instr of
   AMOSWAP_D{} -> RV64A; AMOADD_D{}  -> RV64A; AMOXOR_D{}  -> RV64A
   AMOAND_D{}  -> RV64A; AMOOR_D{}   -> RV64A; AMOMIN_D{}  -> RV64A
   AMOMAX_D{}  -> RV64A; AMOMINU_D{} -> RV64A; AMOMAXU_D{} -> RV64A
+  -- RV64F
+  FLW{} -> RV64F; FSW{} -> RV64F
+  FMADD_S{} -> RV64F; FMSUB_S{} -> RV64F; FNMADD_S{} -> RV64F; FNMSUB_S{} -> RV64F
+  FADD_S{} -> RV64F; FSUB_S{} -> RV64F; FMUL_S{} -> RV64F; FDIV_S{} -> RV64F
+  FSQRT_S{} -> RV64F; FSGNJ_S{} -> RV64F; FSGNJN_S{} -> RV64F; FSGNJX_S{} -> RV64F
+  FMIN_S{} -> RV64F; FMAX_S{} -> RV64F
+  FCVT_W_S{} -> RV64F; FCVT_WU_S{} -> RV64F; FCVT_L_S{} -> RV64F; FCVT_LU_S{} -> RV64F
+  FCVT_S_W{} -> RV64F; FCVT_S_WU{} -> RV64F; FCVT_S_L{} -> RV64F; FCVT_S_LU{} -> RV64F
+  FMV_X_W{} -> RV64F; FMV_W_X{} -> RV64F
+  FEQ_S{} -> RV64F; FLT_S{} -> RV64F; FLE_S{} -> RV64F; FCLASS_S{} -> RV64F
+  -- RV64D
+  FLD{} -> RV64D; FSD{} -> RV64D
+  FMADD_D{} -> RV64D; FMSUB_D{} -> RV64D; FNMADD_D{} -> RV64D; FNMSUB_D{} -> RV64D
+  FADD_D{} -> RV64D; FSUB_D{} -> RV64D; FMUL_D{} -> RV64D; FDIV_D{} -> RV64D
+  FSQRT_D{} -> RV64D; FSGNJ_D{} -> RV64D; FSGNJN_D{} -> RV64D; FSGNJX_D{} -> RV64D
+  FMIN_D{} -> RV64D; FMAX_D{} -> RV64D
+  FCVT_S_D{} -> RV64D; FCVT_D_S{} -> RV64D
+  FCVT_W_D{} -> RV64D; FCVT_WU_D{} -> RV64D; FCVT_L_D{} -> RV64D; FCVT_LU_D{} -> RV64D
+  FCVT_D_W{} -> RV64D; FCVT_D_WU{} -> RV64D; FCVT_D_L{} -> RV64D; FCVT_D_LU{} -> RV64D
+  FMV_X_D{} -> RV64D; FMV_D_X{} -> RV64D
+  FEQ_D{} -> RV64D; FLT_D{} -> RV64D; FLE_D{} -> RV64D; FCLASS_D{} -> RV64D
   _        -> RV64I
 
 instrFormat :: Instruction -> InstrFormat
@@ -197,6 +290,27 @@ instrFormat = \case
   BLTU{} -> BFormat; BGEU{} -> BFormat
   LUI{} -> UFormat; AUIPC{} -> UFormat
   JAL{} -> JFormat
+  -- RV64F
+  FLW{} -> IFormat; FSW{} -> SFormat
+  FMADD_S{} -> RFormat; FMSUB_S{} -> RFormat; FNMADD_S{} -> RFormat; FNMSUB_S{} -> RFormat
+  FADD_S{} -> RFormat; FSUB_S{} -> RFormat; FMUL_S{} -> RFormat; FDIV_S{} -> RFormat
+  FSQRT_S{} -> RFormat; FSGNJ_S{} -> RFormat; FSGNJN_S{} -> RFormat; FSGNJX_S{} -> RFormat
+  FMIN_S{} -> RFormat; FMAX_S{} -> RFormat
+  FCVT_W_S{} -> IFormat; FCVT_WU_S{} -> IFormat; FCVT_L_S{} -> IFormat; FCVT_LU_S{} -> IFormat
+  FCVT_S_W{} -> RFormat; FCVT_S_WU{} -> RFormat; FCVT_S_L{} -> RFormat; FCVT_S_LU{} -> RFormat
+  FMV_X_W{} -> RFormat; FMV_W_X{} -> RFormat
+  FEQ_S{} -> RFormat; FLT_S{} -> RFormat; FLE_S{} -> RFormat; FCLASS_S{} -> RFormat
+  -- RV64D
+  FLD{} -> IFormat; FSD{} -> SFormat
+  FMADD_D{} -> RFormat; FMSUB_D{} -> RFormat; FNMADD_D{} -> RFormat; FNMSUB_D{} -> RFormat
+  FADD_D{} -> RFormat; FSUB_D{} -> RFormat; FMUL_D{} -> RFormat; FDIV_D{} -> RFormat
+  FSQRT_D{} -> RFormat; FSGNJ_D{} -> RFormat; FSGNJN_D{} -> RFormat; FSGNJX_D{} -> RFormat
+  FMIN_D{} -> RFormat; FMAX_D{} -> RFormat
+  FCVT_S_D{} -> RFormat; FCVT_D_S{} -> RFormat
+  FCVT_W_D{} -> IFormat; FCVT_WU_D{} -> IFormat; FCVT_L_D{} -> IFormat; FCVT_LU_D{} -> IFormat
+  FCVT_D_W{} -> RFormat; FCVT_D_WU{} -> RFormat; FCVT_D_L{} -> RFormat; FCVT_D_LU{} -> RFormat
+  FMV_X_D{} -> RFormat; FMV_D_X{} -> RFormat
+  FEQ_D{} -> RFormat; FLT_D{} -> RFormat; FLE_D{} -> RFormat; FCLASS_D{} -> RFormat
 
 isRV64I, isRV64M, isPrivileged :: Instruction -> Bool
 isRV64I      i = instrExtension i == RV64I

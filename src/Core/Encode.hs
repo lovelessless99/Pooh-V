@@ -90,6 +90,25 @@ buildAMO funct5 aq rl rs2W rs1W funct3 rdW =
   .|. (rs2W `shiftL` 20) .|. (rs1W `shiftL` 15)
   .|. (funct3 `shiftL` 12) .|. (rdW `shiftL` 7) .|. 0x2F
 
+fr :: FPRegister -> Word32
+fr (FPRegister x) = fromIntegral x
+
+encodeRM :: RoundingMode -> Word32
+encodeRM RNE = 0; encodeRM RTZ = 1; encodeRM RDN = 2
+encodeRM RUP = 3; encodeRM RMM = 4; encodeRM DYN = 7
+
+-- Standard FP operation: opcode=0x53
+buildFPOp :: Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> Word32
+buildFPOp funct7 rs2W rs1W rmW rdW =
+  (funct7 `shiftL` 25) .|. (rs2W `shiftL` 20) .|. (rs1W `shiftL` 15)
+  .|. (rmW `shiftL` 12) .|. (rdW `shiftL` 7) .|. 0x53
+
+-- R4 format: FMADD/FMSUB/FNMADD/FNMSUB
+buildR4 :: Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> Word32
+buildR4 opcode rs3W fmt rs2W rs1W rmW rdW =
+  (rs3W `shiftL` 27) .|. (fmt `shiftL` 25) .|. (rs2W `shiftL` 20)
+  .|. (rs1W `shiftL` 15) .|. (rmW `shiftL` 12) .|. (rdW `shiftL` 7) .|. opcode
+
 encode :: Instruction -> Word32
 encode = \case
   ADD  rd rs1 rs2 -> buildR 0x33 (r rd) 0x0 (r rs1) (r rs2) 0x00
@@ -195,3 +214,67 @@ encode = \case
   AMOMAX_D  rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x14 a l (r rs2) (r rs1) 0x3 (r rd)
   AMOMINU_D rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x18 a l (r rs2) (r rs1) 0x3 (r rd)
   AMOMAXU_D rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x1C a l (r rs2) (r rs1) 0x3 (r rd)
+  -- ── RV64F ─────────────────────────────────────────────────────
+  FLW  rd rs1 imm -> buildI 0x07 (fr rd) 0x2 (r rs1) (i12 imm)
+  FSW  rs2 rs1 imm -> buildS 0x27 0x2 (r rs1) (fr rs2) (i12 imm)
+  FMADD_S  rd rs1 rs2 rs3 rm -> buildR4 0x43 (fr rs3) 0x0 (fr rs2) (fr rs1) (encodeRM rm) (fr rd)
+  FMSUB_S  rd rs1 rs2 rs3 rm -> buildR4 0x47 (fr rs3) 0x0 (fr rs2) (fr rs1) (encodeRM rm) (fr rd)
+  FNMSUB_S rd rs1 rs2 rs3 rm -> buildR4 0x4B (fr rs3) 0x0 (fr rs2) (fr rs1) (encodeRM rm) (fr rd)
+  FNMADD_S rd rs1 rs2 rs3 rm -> buildR4 0x4F (fr rs3) 0x0 (fr rs2) (fr rs1) (encodeRM rm) (fr rd)
+  FADD_S  rd rs1 rs2 rm -> buildFPOp 0x00 (fr rs2) (fr rs1) (encodeRM rm) (fr rd)
+  FSUB_S  rd rs1 rs2 rm -> buildFPOp 0x04 (fr rs2) (fr rs1) (encodeRM rm) (fr rd)
+  FMUL_S  rd rs1 rs2 rm -> buildFPOp 0x08 (fr rs2) (fr rs1) (encodeRM rm) (fr rd)
+  FDIV_S  rd rs1 rs2 rm -> buildFPOp 0x0C (fr rs2) (fr rs1) (encodeRM rm) (fr rd)
+  FSQRT_S rd rs1 rm     -> buildFPOp 0x2C 0          (fr rs1) (encodeRM rm) (fr rd)
+  FSGNJ_S  rd rs1 rs2   -> buildFPOp 0x10 (fr rs2) (fr rs1) 0x0 (fr rd)
+  FSGNJN_S rd rs1 rs2   -> buildFPOp 0x10 (fr rs2) (fr rs1) 0x1 (fr rd)
+  FSGNJX_S rd rs1 rs2   -> buildFPOp 0x10 (fr rs2) (fr rs1) 0x2 (fr rd)
+  FMIN_S   rd rs1 rs2   -> buildFPOp 0x14 (fr rs2) (fr rs1) 0x0 (fr rd)
+  FMAX_S   rd rs1 rs2   -> buildFPOp 0x14 (fr rs2) (fr rs1) 0x1 (fr rd)
+  FCVT_W_S  rd rs1 rm -> buildFPOp 0x60 0x00 (fr rs1) (encodeRM rm) (r rd)
+  FCVT_WU_S rd rs1 rm -> buildFPOp 0x60 0x01 (fr rs1) (encodeRM rm) (r rd)
+  FCVT_L_S  rd rs1 rm -> buildFPOp 0x60 0x02 (fr rs1) (encodeRM rm) (r rd)
+  FCVT_LU_S rd rs1 rm -> buildFPOp 0x60 0x03 (fr rs1) (encodeRM rm) (r rd)
+  FCVT_S_W  rd rs1 rm -> buildFPOp 0x68 0x00 (r rs1) (encodeRM rm) (fr rd)
+  FCVT_S_WU rd rs1 rm -> buildFPOp 0x68 0x01 (r rs1) (encodeRM rm) (fr rd)
+  FCVT_S_L  rd rs1 rm -> buildFPOp 0x68 0x02 (r rs1) (encodeRM rm) (fr rd)
+  FCVT_S_LU rd rs1 rm -> buildFPOp 0x68 0x03 (r rs1) (encodeRM rm) (fr rd)
+  FMV_X_W   rd rs1    -> buildFPOp 0x70 0x00 (fr rs1) 0x0 (r rd)
+  FMV_W_X   rd rs1    -> buildFPOp 0x78 0x00 (r rs1) 0x0 (fr rd)
+  FEQ_S     rd rs1 rs2 -> buildFPOp 0x50 (fr rs2) (fr rs1) 0x2 (r rd)
+  FLT_S     rd rs1 rs2 -> buildFPOp 0x50 (fr rs2) (fr rs1) 0x1 (r rd)
+  FLE_S     rd rs1 rs2 -> buildFPOp 0x50 (fr rs2) (fr rs1) 0x0 (r rd)
+  FCLASS_S  rd rs1     -> buildFPOp 0x70 0x00 (fr rs1) 0x1 (r rd)
+  -- ── RV64D ─────────────────────────────────────────────────────
+  FLD  rd rs1 imm -> buildI 0x07 (fr rd) 0x3 (r rs1) (i12 imm)
+  FSD  rs2 rs1 imm -> buildS 0x27 0x3 (r rs1) (fr rs2) (i12 imm)
+  FMADD_D  rd rs1 rs2 rs3 rm -> buildR4 0x43 (fr rs3) 0x1 (fr rs2) (fr rs1) (encodeRM rm) (fr rd)
+  FMSUB_D  rd rs1 rs2 rs3 rm -> buildR4 0x47 (fr rs3) 0x1 (fr rs2) (fr rs1) (encodeRM rm) (fr rd)
+  FNMSUB_D rd rs1 rs2 rs3 rm -> buildR4 0x4B (fr rs3) 0x1 (fr rs2) (fr rs1) (encodeRM rm) (fr rd)
+  FNMADD_D rd rs1 rs2 rs3 rm -> buildR4 0x4F (fr rs3) 0x1 (fr rs2) (fr rs1) (encodeRM rm) (fr rd)
+  FADD_D  rd rs1 rs2 rm -> buildFPOp 0x01 (fr rs2) (fr rs1) (encodeRM rm) (fr rd)
+  FSUB_D  rd rs1 rs2 rm -> buildFPOp 0x05 (fr rs2) (fr rs1) (encodeRM rm) (fr rd)
+  FMUL_D  rd rs1 rs2 rm -> buildFPOp 0x09 (fr rs2) (fr rs1) (encodeRM rm) (fr rd)
+  FDIV_D  rd rs1 rs2 rm -> buildFPOp 0x0D (fr rs2) (fr rs1) (encodeRM rm) (fr rd)
+  FSQRT_D rd rs1 rm     -> buildFPOp 0x2D 0          (fr rs1) (encodeRM rm) (fr rd)
+  FSGNJ_D  rd rs1 rs2   -> buildFPOp 0x11 (fr rs2) (fr rs1) 0x0 (fr rd)
+  FSGNJN_D rd rs1 rs2   -> buildFPOp 0x11 (fr rs2) (fr rs1) 0x1 (fr rd)
+  FSGNJX_D rd rs1 rs2   -> buildFPOp 0x11 (fr rs2) (fr rs1) 0x2 (fr rd)
+  FMIN_D   rd rs1 rs2   -> buildFPOp 0x15 (fr rs2) (fr rs1) 0x0 (fr rd)
+  FMAX_D   rd rs1 rs2   -> buildFPOp 0x15 (fr rs2) (fr rs1) 0x1 (fr rd)
+  FCVT_S_D rd rs1 rm -> buildFPOp 0x20 0x01 (fr rs1) (encodeRM rm) (fr rd)
+  FCVT_D_S rd rs1 rm -> buildFPOp 0x21 0x00 (fr rs1) (encodeRM rm) (fr rd)
+  FCVT_W_D  rd rs1 rm -> buildFPOp 0x61 0x00 (fr rs1) (encodeRM rm) (r rd)
+  FCVT_WU_D rd rs1 rm -> buildFPOp 0x61 0x01 (fr rs1) (encodeRM rm) (r rd)
+  FCVT_L_D  rd rs1 rm -> buildFPOp 0x61 0x02 (fr rs1) (encodeRM rm) (r rd)
+  FCVT_LU_D rd rs1 rm -> buildFPOp 0x61 0x03 (fr rs1) (encodeRM rm) (r rd)
+  FCVT_D_W  rd rs1 rm -> buildFPOp 0x69 0x00 (r rs1) (encodeRM rm) (fr rd)
+  FCVT_D_WU rd rs1 rm -> buildFPOp 0x69 0x01 (r rs1) (encodeRM rm) (fr rd)
+  FCVT_D_L  rd rs1 rm -> buildFPOp 0x69 0x02 (r rs1) (encodeRM rm) (fr rd)
+  FCVT_D_LU rd rs1 rm -> buildFPOp 0x69 0x03 (r rs1) (encodeRM rm) (fr rd)
+  FMV_X_D   rd rs1    -> buildFPOp 0x71 0x00 (fr rs1) 0x0 (r rd)
+  FMV_D_X   rd rs1    -> buildFPOp 0x79 0x00 (r rs1) 0x0 (fr rd)
+  FEQ_D     rd rs1 rs2 -> buildFPOp 0x51 (fr rs2) (fr rs1) 0x2 (r rd)
+  FLT_D     rd rs1 rs2 -> buildFPOp 0x51 (fr rs2) (fr rs1) 0x1 (r rd)
+  FLE_D     rd rs1 rs2 -> buildFPOp 0x51 (fr rs2) (fr rs1) 0x0 (r rd)
+  FCLASS_D  rd rs1     -> buildFPOp 0x71 0x00 (fr rs1) 0x1 (r rd)

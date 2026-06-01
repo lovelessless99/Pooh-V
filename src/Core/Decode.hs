@@ -87,6 +87,13 @@ decode w = case opcode w of
   0x73 -> decodeSystem w
   0x0F -> decodeFence w
   0x2F -> decodeAMO w
+  0x07 -> decodeFPLoad w
+  0x27 -> decodeFPStore w
+  0x43 -> decodeFMAdd 0x43 w
+  0x47 -> decodeFMAdd 0x47 w
+  0x4B -> decodeFMAdd 0x4B w
+  0x4F -> decodeFMAdd 0x4F w
+  0x53 -> decodeFPOp w
   op   -> Left (UnknownOpcode op)
 
 decodeR33 :: Word32 -> Either DecodeError Instruction
@@ -270,3 +277,104 @@ decodeAMO w =
     (0x3, 0x18) -> Right $ AMOMINU_D rd_ rs1_ rs2_ aqrl
     (0x3, 0x1C) -> Right $ AMOMAXU_D rd_ rs1_ rs2_ aqrl
     _           -> Left  $ UnknownFunct3 0x2F funct3
+
+mkFP :: Word32 -> FPRegister
+mkFP = FPRegister . fromIntegral
+
+decodeRM :: Word32 -> RoundingMode
+decodeRM 0 = RNE; decodeRM 1 = RTZ; decodeRM 2 = RDN
+decodeRM 3 = RUP; decodeRM 4 = RMM; decodeRM _ = DYN
+
+decodeFPLoad :: Word32 -> Either DecodeError Instruction
+decodeFPLoad w = case funct3' w of
+  0x2 -> Right $ FLW (mkFP (rd' w)) (mkReg (rs1' w)) (Imm12 (signExt12 (field w 31 20)))
+  0x3 -> Right $ FLD (mkFP (rd' w)) (mkReg (rs1' w)) (Imm12 (signExt12 (field w 31 20)))
+  f   -> Left  $ UnknownFunct3 0x07 f
+
+decodeFPStore :: Word32 -> Either DecodeError Instruction
+decodeFPStore w =
+  let imm = Imm12 $ signExt12 $
+              ((field w 31 25) `shiftL` 5) .|. (field w 11 7)
+  in case funct3' w of
+    0x2 -> Right $ FSW (mkFP (rs2' w)) (mkReg (rs1' w)) imm
+    0x3 -> Right $ FSD (mkFP (rs2' w)) (mkReg (rs1' w)) imm
+    f   -> Left  $ UnknownFunct3 0x27 f
+
+decodeFMAdd :: Word32 -> Word32 -> Either DecodeError Instruction
+decodeFMAdd op w =
+  let rd_  = mkFP (rd' w); rs1_ = mkFP (rs1' w)
+      rs2_ = mkFP (rs2' w); rs3_ = mkFP (field w 31 27)
+      rm_  = decodeRM (funct3' w)
+      fmt  = field w 26 25
+  in case (op, fmt) of
+    (0x43, 0) -> Right $ FMADD_S  rd_ rs1_ rs2_ rs3_ rm_
+    (0x47, 0) -> Right $ FMSUB_S  rd_ rs1_ rs2_ rs3_ rm_
+    (0x4B, 0) -> Right $ FNMSUB_S rd_ rs1_ rs2_ rs3_ rm_
+    (0x4F, 0) -> Right $ FNMADD_S rd_ rs1_ rs2_ rs3_ rm_
+    (0x43, 1) -> Right $ FMADD_D  rd_ rs1_ rs2_ rs3_ rm_
+    (0x47, 1) -> Right $ FMSUB_D  rd_ rs1_ rs2_ rs3_ rm_
+    (0x4B, 1) -> Right $ FNMSUB_D rd_ rs1_ rs2_ rs3_ rm_
+    (0x4F, 1) -> Right $ FNMADD_D rd_ rs1_ rs2_ rs3_ rm_
+    _         -> Left  $ ReservedEncoding w
+
+decodeFPOp :: Word32 -> Either DecodeError Instruction
+decodeFPOp w =
+  let f7   = funct7' w; f3 = funct3' w
+      rd_  = mkFP (rd' w); rdi  = mkReg (rd' w)
+      rs1f = mkFP (rs1' w); rs1i = mkReg (rs1' w)
+      rs2f = mkFP (rs2' w)
+      rs2  = rs2' w
+      rm   = decodeRM f3
+  in case (f7, f3, rs2) of
+    (0x00, _, _)  -> Right $ FADD_S  rd_ rs1f rs2f rm
+    (0x04, _, _)  -> Right $ FSUB_S  rd_ rs1f rs2f rm
+    (0x08, _, _)  -> Right $ FMUL_S  rd_ rs1f rs2f rm
+    (0x0C, _, _)  -> Right $ FDIV_S  rd_ rs1f rs2f rm
+    (0x2C, _, 0)  -> Right $ FSQRT_S rd_ rs1f rm
+    (0x10, 0, _)  -> Right $ FSGNJ_S  rd_ rs1f rs2f
+    (0x10, 1, _)  -> Right $ FSGNJN_S rd_ rs1f rs2f
+    (0x10, 2, _)  -> Right $ FSGNJX_S rd_ rs1f rs2f
+    (0x14, 0, _)  -> Right $ FMIN_S  rd_ rs1f rs2f
+    (0x14, 1, _)  -> Right $ FMAX_S  rd_ rs1f rs2f
+    (0x50, 2, _)  -> Right $ FEQ_S   rdi rs1f rs2f
+    (0x50, 1, _)  -> Right $ FLT_S   rdi rs1f rs2f
+    (0x50, 0, _)  -> Right $ FLE_S   rdi rs1f rs2f
+    (0x60, _, 0)  -> Right $ FCVT_W_S  rdi rs1f rm
+    (0x60, _, 1)  -> Right $ FCVT_WU_S rdi rs1f rm
+    (0x60, _, 2)  -> Right $ FCVT_L_S  rdi rs1f rm
+    (0x60, _, 3)  -> Right $ FCVT_LU_S rdi rs1f rm
+    (0x68, _, 0)  -> Right $ FCVT_S_W  rd_ rs1i rm
+    (0x68, _, 1)  -> Right $ FCVT_S_WU rd_ rs1i rm
+    (0x68, _, 2)  -> Right $ FCVT_S_L  rd_ rs1i rm
+    (0x68, _, 3)  -> Right $ FCVT_S_LU rd_ rs1i rm
+    (0x70, 0, 0)  -> Right $ FMV_X_W   rdi rs1f
+    (0x70, 1, 0)  -> Right $ FCLASS_S  rdi rs1f
+    (0x78, 0, 0)  -> Right $ FMV_W_X   rd_ rs1i
+    -- D variants
+    (0x01, _, _)  -> Right $ FADD_D  rd_ rs1f rs2f rm
+    (0x05, _, _)  -> Right $ FSUB_D  rd_ rs1f rs2f rm
+    (0x09, _, _)  -> Right $ FMUL_D  rd_ rs1f rs2f rm
+    (0x0D, _, _)  -> Right $ FDIV_D  rd_ rs1f rs2f rm
+    (0x2D, _, 0)  -> Right $ FSQRT_D rd_ rs1f rm
+    (0x11, 0, _)  -> Right $ FSGNJ_D  rd_ rs1f rs2f
+    (0x11, 1, _)  -> Right $ FSGNJN_D rd_ rs1f rs2f
+    (0x11, 2, _)  -> Right $ FSGNJX_D rd_ rs1f rs2f
+    (0x15, 0, _)  -> Right $ FMIN_D  rd_ rs1f rs2f
+    (0x15, 1, _)  -> Right $ FMAX_D  rd_ rs1f rs2f
+    (0x20, _, 1)  -> Right $ FCVT_S_D rd_ rs1f rm
+    (0x21, _, 0)  -> Right $ FCVT_D_S rd_ rs1f rm
+    (0x51, 2, _)  -> Right $ FEQ_D   rdi rs1f rs2f
+    (0x51, 1, _)  -> Right $ FLT_D   rdi rs1f rs2f
+    (0x51, 0, _)  -> Right $ FLE_D   rdi rs1f rs2f
+    (0x61, _, 0)  -> Right $ FCVT_W_D  rdi rs1f rm
+    (0x61, _, 1)  -> Right $ FCVT_WU_D rdi rs1f rm
+    (0x61, _, 2)  -> Right $ FCVT_L_D  rdi rs1f rm
+    (0x61, _, 3)  -> Right $ FCVT_LU_D rdi rs1f rm
+    (0x69, _, 0)  -> Right $ FCVT_D_W  rd_ rs1i rm
+    (0x69, _, 1)  -> Right $ FCVT_D_WU rd_ rs1i rm
+    (0x69, _, 2)  -> Right $ FCVT_D_L  rd_ rs1i rm
+    (0x69, _, 3)  -> Right $ FCVT_D_LU rd_ rs1i rm
+    (0x71, 0, 0)  -> Right $ FMV_X_D   rdi rs1f
+    (0x71, 1, 0)  -> Right $ FCLASS_D  rdi rs1f
+    (0x79, 0, 0)  -> Right $ FMV_D_X   rd_ rs1i
+    _             -> Left  $ UnknownFunct7 0x53 f3 f7
