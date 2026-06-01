@@ -28,13 +28,21 @@ data OpcodeCategory
   | SystemOp    -- ECALL, EBREAK, FENCE, CSR
   | MulDiv      -- RV64M
   | PrivOp      -- MRET, SRET, WFI
+  | AtomicOp    -- RV64A: LR/SC/AMO
+  | FloatSOp    -- RV64F: single-precision FP
+  | FloatDOp    -- RV64D: double-precision FP
+  | CompressOp  -- RV64C: compressed
   deriving (Show, Eq, Ord, Enum, Bounded)
 
 availableOpcodes :: [Extension] -> [OpcodeCategory]
 availableOpcodes exts =
   [ AluR, AluI, LoadOp, StoreOp, BranchOp, JumpOp, UpperImm, SystemOp ]
-  <> [ MulDiv | RV64M `elem` exts ]
-  <> [ PrivOp | RVPriv `elem` exts ]
+  <> [ MulDiv     | RV64M `elem` exts ]
+  <> [ PrivOp     | RVPriv `elem` exts ]
+  <> [ AtomicOp   | RV64A `elem` exts ]
+  <> [ FloatSOp   | RV64F `elem` exts ]
+  <> [ FloatDOp   | RV64D `elem` exts ]
+  <> [ CompressOp | RV64C `elem` exts ]
 
 genInstruction :: [Extension] -> Gen Instruction
 genInstruction exts = do
@@ -50,6 +58,10 @@ genInstruction exts = do
     SystemOp -> genSystem
     MulDiv   -> genMulDiv
     PrivOp   -> genPriv
+    AtomicOp  -> genAtomic
+    FloatSOp  -> genFloatS
+    FloatDOp  -> genFloatD
+    CompressOp -> genCompress
 
 -- ── Register / Immediate generators ──────────────────────────────
 
@@ -190,6 +202,133 @@ genMulDiv = Gen.choice
 
 genPriv :: Gen Instruction
 genPriv = Gen.element [MRET, WFI]
+
+-- ── RV64A/F/D/C helpers ───────────────────────────────────────────
+
+genAqRl :: Gen AqRl
+genAqRl = Gen.element [AqRlNone, AqRlRelease, AqRlAcquire, AqRlAcqRel]
+
+genFPReg :: Gen FPRegister
+genFPReg = FPRegister <$> Gen.word8 (Range.linear 0 31)
+
+genRM :: Gen RoundingMode
+genRM = Gen.element [RNE, RTZ, RDN, RUP, RMM, DYN]
+
+genImm6 :: Gen Imm6
+genImm6 = Imm6 <$> Gen.int8 (Range.linearFrom 0 (-32) 31)
+
+genUImm7 :: Gen UImm7
+genUImm7 = UImm7 <$> Gen.word8 (Range.linear 0 127)
+
+genUImm8 :: Gen UImm8
+genUImm8 = UImm8 <$> Gen.word8 (Range.linear 0 255)
+
+genUImm9 :: Gen UImm9
+genUImm9 = UImm9 <$> Gen.word16 (Range.linear 0 511)
+
+genUImm10 :: Gen UImm10
+genUImm10 = UImm10 <$> Gen.word16 (Range.linear 0 1023)
+
+genImm9_ :: Gen Imm9
+genImm9_ = Imm9 <$> Gen.int16 (Range.linearFrom 0 (-256) 254)
+
+genImm10_ :: Gen Imm10
+genImm10_ = Imm10 <$> Gen.int16 (Range.linearFrom 0 (-512) 496)
+
+-- RV64A generator
+genAtomic :: Gen Instruction
+genAtomic = do
+  rd  <- genNonZeroReg
+  rs1 <- genNonZeroReg
+  rs2 <- genNonZeroReg
+  aq  <- genAqRl
+  Gen.element
+    [ LR_W rd rs1 aq, LR_D rd rs1 aq
+    , SC_W rd rs1 rs2 aq, SC_D rd rs1 rs2 aq
+    , AMOSWAP_W rd rs1 rs2 aq, AMOADD_W rd rs1 rs2 aq
+    , AMOXOR_W  rd rs1 rs2 aq, AMOAND_W rd rs1 rs2 aq
+    , AMOOR_W   rd rs1 rs2 aq, AMOMIN_W rd rs1 rs2 aq
+    , AMOMAX_W  rd rs1 rs2 aq, AMOMINU_W rd rs1 rs2 aq
+    , AMOMAXU_W rd rs1 rs2 aq
+    , AMOSWAP_D rd rs1 rs2 aq, AMOADD_D rd rs1 rs2 aq
+    , AMOXOR_D  rd rs1 rs2 aq, AMOAND_D rd rs1 rs2 aq
+    , AMOOR_D   rd rs1 rs2 aq, AMOMIN_D rd rs1 rs2 aq
+    , AMOMAX_D  rd rs1 rs2 aq, AMOMINU_D rd rs1 rs2 aq
+    , AMOMAXU_D rd rs1 rs2 aq
+    ]
+
+-- RV64F generator
+genFloatS :: Gen Instruction
+genFloatS = do
+  frd  <- genFPReg; frs1 <- genFPReg; frs2 <- genFPReg; frs3 <- genFPReg
+  rd   <- genNonZeroReg; rs1 <- genNonZeroReg
+  rm   <- genRM; imm <- genImm12
+  Gen.element
+    [ FLW frd rs1 imm, FSW frd rs1 imm
+    , FADD_S frd frs1 frs2 rm, FSUB_S frd frs1 frs2 rm
+    , FMUL_S frd frs1 frs2 rm, FDIV_S frd frs1 frs2 rm
+    , FSQRT_S frd frs1 rm
+    , FSGNJ_S frd frs1 frs2, FSGNJN_S frd frs1 frs2, FSGNJX_S frd frs1 frs2
+    , FMIN_S frd frs1 frs2, FMAX_S frd frs1 frs2
+    , FCVT_W_S rd frs1 rm, FCVT_WU_S rd frs1 rm
+    , FCVT_L_S rd frs1 rm, FCVT_LU_S rd frs1 rm
+    , FCVT_S_W frd rs1 rm, FCVT_S_WU frd rs1 rm
+    , FCVT_S_L frd rs1 rm, FCVT_S_LU frd rs1 rm
+    , FMV_X_W rd frs1, FMV_W_X frd rs1
+    , FEQ_S rd frs1 frs2, FLT_S rd frs1 frs2, FLE_S rd frs1 frs2
+    , FCLASS_S rd frs1
+    , FMADD_S frd frs1 frs2 frs3 rm, FMSUB_S frd frs1 frs2 frs3 rm
+    ]
+
+-- RV64D generator
+genFloatD :: Gen Instruction
+genFloatD = do
+  frd  <- genFPReg; frs1 <- genFPReg; frs2 <- genFPReg; frs3 <- genFPReg
+  rd   <- genNonZeroReg; rs1 <- genNonZeroReg
+  rm   <- genRM; imm <- genImm12
+  Gen.element
+    [ FLD frd rs1 imm, FSD frd rs1 imm
+    , FADD_D frd frs1 frs2 rm, FSUB_D frd frs1 frs2 rm
+    , FMUL_D frd frs1 frs2 rm, FDIV_D frd frs1 frs2 rm
+    , FSQRT_D frd frs1 rm
+    , FCVT_S_D frd frs1 rm, FCVT_D_S frd frs1 rm
+    , FCVT_W_D rd frs1 rm, FCVT_WU_D rd frs1 rm
+    , FCVT_L_D rd frs1 rm, FCVT_LU_D rd frs1 rm
+    , FCVT_D_W frd rs1 rm, FMV_X_D rd frs1, FMV_D_X frd rs1
+    , FEQ_D rd frs1 frs2, FLT_D rd frs1 frs2, FLE_D rd frs1 frs2
+    , FCLASS_D rd frs1
+    , FMADD_D frd frs1 frs2 frs3 rm, FMSUB_D frd frs1 frs2 frs3 rm
+    ]
+
+-- RV64C generator (restricted registers x8-x15 for compressed ops)
+genCReg :: Gen Register
+genCReg = Register <$> Gen.word8 (Range.linear 8 15)
+
+genCompress :: Gen Instruction
+genCompress = do
+  rd   <- genNonZeroReg; rs1 <- genNonZeroReg; rs2 <- genNonZeroReg
+  rd'  <- genCReg;       rs1' <- genCReg;       rs2' <- genCReg
+  imm6 <- genImm6
+  u7   <- genUImm7;   u8 <- genUImm8
+  u9   <- genUImm9;   u10 <- genUImm10
+  imm9_ <- genImm9_;  imm10_ <- genImm10_
+  Gen.element
+    [ C_ADDI rd imm6, C_ADDIW rd imm6, C_LI rd imm6
+    , C_ADDI4SPN rd' u10, C_LW rd' rs1' u7, C_LD rd' rs1' u8
+    , C_SW rs1' rs2' u7, C_SD rs1' rs2' u8
+    , C_SRLI rd' (UImm6 (unUImm8 u8 `mod` 64))
+    , C_SRAI rd' (UImm6 (unUImm8 u8 `mod` 64))
+    , C_ANDI rd' imm6
+    , C_SUB rd' rs2', C_XOR rd' rs2', C_OR rd' rs2', C_AND rd' rs2'
+    , C_SUBW rd' rs2', C_ADDW rd' rs2'
+    , C_J (Imm12 0)
+    , C_BEQZ rs1' imm9_, C_BNEZ rs1' imm9_
+    , C_SLLI rd (UImm6 (unUImm8 u8 `mod` 64))
+    , C_LWSP rd u8, C_LDSP rd u9
+    , C_JR rs1, C_MV rd rs2, C_EBREAK, C_JALR rs1, C_ADD rd rs2
+    , C_SWSP rs2 u8, C_SDSP rs2 u9
+    , C_ADDI16SP imm10_
+    ]
 
 -- ── Sequence generation ───────────────────────────────────────────
 
