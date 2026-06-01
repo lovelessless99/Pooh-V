@@ -9,6 +9,7 @@ import qualified Test.Core.Compressed   as Compressed
 import qualified Test.Constraint.Solver as CSolver
 import qualified Test.Generator.Random  as GenRandom
 import qualified Test.Coverage.Accumulator as CovAccum
+import qualified Test.Coverage.Bins        as CovBins
 import qualified Test.ELF.FlatBinary    as ELFTest
 import qualified Test.CoSim.Spike       as SpikeTest
 
@@ -22,6 +23,7 @@ main = defaultMain $ testGroup "riscv-rig"
   , CSolver.tests
   , GenRandom.tests
   , CovAccum.tests
+  , CovBins.tests
   , ELFTest.tests
   , SpikeTest.tests
   ]

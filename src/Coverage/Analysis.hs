@@ -43,4 +43,7 @@ renderSummary s = unlines
     progressBar w pct =
       let filled = round (pct / 100.0 * fromIntegral w) :: Int
       in  "[" <> replicate filled '#' <> replicate (w - filled) '.' <> "]"
-    showBin (OpcodeBin name) = show name
+    showBin (OpcodeBin name)        = show name
+    showBin (PatternBin pat)        = show pat
+    showBin (ValueBin vc)           = show vc
+    showBin (OpcodeModeBin mnem pl) = show mnem <> "@" <> show pl
