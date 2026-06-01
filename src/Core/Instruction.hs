@@ -217,6 +217,41 @@ data Instruction
   | FLT_D     Register FPRegister FPRegister
   | FLE_D     Register FPRegister FPRegister
   | FCLASS_D  Register FPRegister
+  -- ── RV64C: Quadrant 00 ─────────────────────────────────────────
+  | C_ADDI4SPN Register UImm10    -- rd' = x8-x15, nzuimm
+  | C_LW  Register Register UImm7 -- rd' rs1' offset
+  | C_LD  Register Register UImm8 -- rd' rs1' offset
+  | C_SW  Register Register UImm7 -- rs1' rs2' offset
+  | C_SD  Register Register UImm8 -- rs1' rs2' offset
+  -- ── RV64C: Quadrant 01 ─────────────────────────────────────────
+  | C_ADDI   Register Imm6
+  | C_ADDIW  Register Imm6
+  | C_LI     Register Imm6
+  | C_ADDI16SP Imm10
+  | C_LUI    Register Imm6
+  | C_SRLI   Register UImm6
+  | C_SRAI   Register UImm6
+  | C_ANDI   Register Imm6
+  | C_SUB    Register Register
+  | C_XOR    Register Register
+  | C_OR     Register Register
+  | C_AND    Register Register
+  | C_SUBW   Register Register
+  | C_ADDW   Register Register
+  | C_J      Imm12
+  | C_BEQZ   Register Imm9
+  | C_BNEZ   Register Imm9
+  -- ── RV64C: Quadrant 10 ─────────────────────────────────────────
+  | C_SLLI   Register UImm6
+  | C_LWSP   Register UImm8
+  | C_LDSP   Register UImm9
+  | C_JR     Register
+  | C_MV     Register Register
+  | C_EBREAK
+  | C_JALR   Register
+  | C_ADD    Register Register
+  | C_SWSP   Register UImm8
+  | C_SDSP   Register UImm9
   deriving (Show, Eq, Ord, Generic)
 
 instrExtension :: Instruction -> Extension
@@ -255,6 +290,19 @@ instrExtension instr = case instr of
   FCVT_D_W{} -> RV64D; FCVT_D_WU{} -> RV64D; FCVT_D_L{} -> RV64D; FCVT_D_LU{} -> RV64D
   FMV_X_D{} -> RV64D; FMV_D_X{} -> RV64D
   FEQ_D{} -> RV64D; FLT_D{} -> RV64D; FLE_D{} -> RV64D; FCLASS_D{} -> RV64D
+  -- RV64C
+  C_ADDI4SPN{} -> RV64C; C_LW{} -> RV64C; C_LD{} -> RV64C
+  C_SW{} -> RV64C; C_SD{} -> RV64C
+  C_ADDI{} -> RV64C; C_ADDIW{} -> RV64C; C_LI{} -> RV64C
+  C_ADDI16SP{} -> RV64C; C_LUI{} -> RV64C
+  C_SRLI{} -> RV64C; C_SRAI{} -> RV64C; C_ANDI{} -> RV64C
+  C_SUB{} -> RV64C; C_XOR{} -> RV64C; C_OR{} -> RV64C; C_AND{} -> RV64C
+  C_SUBW{} -> RV64C; C_ADDW{} -> RV64C
+  C_J{} -> RV64C; C_BEQZ{} -> RV64C; C_BNEZ{} -> RV64C
+  C_SLLI{} -> RV64C; C_LWSP{} -> RV64C; C_LDSP{} -> RV64C
+  C_JR{} -> RV64C; C_MV{} -> RV64C; C_EBREAK -> RV64C
+  C_JALR{} -> RV64C; C_ADD{} -> RV64C
+  C_SWSP{} -> RV64C; C_SDSP{} -> RV64C
   _        -> RV64I
 
 instrFormat :: Instruction -> InstrFormat
@@ -311,6 +359,19 @@ instrFormat = \case
   FCVT_D_W{} -> RFormat; FCVT_D_WU{} -> RFormat; FCVT_D_L{} -> RFormat; FCVT_D_LU{} -> RFormat
   FMV_X_D{} -> RFormat; FMV_D_X{} -> RFormat
   FEQ_D{} -> RFormat; FLT_D{} -> RFormat; FLE_D{} -> RFormat; FCLASS_D{} -> RFormat
+  -- RV64C (placeholder format)
+  C_ADDI4SPN{} -> IFormat; C_LW{} -> IFormat; C_LD{} -> IFormat
+  C_SW{} -> IFormat; C_SD{} -> IFormat
+  C_ADDI{} -> IFormat; C_ADDIW{} -> IFormat; C_LI{} -> IFormat
+  C_ADDI16SP{} -> IFormat; C_LUI{} -> IFormat
+  C_SRLI{} -> IFormat; C_SRAI{} -> IFormat; C_ANDI{} -> IFormat
+  C_SUB{} -> IFormat; C_XOR{} -> IFormat; C_OR{} -> IFormat; C_AND{} -> IFormat
+  C_SUBW{} -> IFormat; C_ADDW{} -> IFormat
+  C_J{} -> IFormat; C_BEQZ{} -> IFormat; C_BNEZ{} -> IFormat
+  C_SLLI{} -> IFormat; C_LWSP{} -> IFormat; C_LDSP{} -> IFormat
+  C_JR{} -> IFormat; C_MV{} -> IFormat; C_EBREAK -> IFormat
+  C_JALR{} -> IFormat; C_ADD{} -> IFormat
+  C_SWSP{} -> IFormat; C_SDSP{} -> IFormat
 
 isRV64I, isRV64M, isPrivileged :: Instruction -> Bool
 isRV64I      i = instrExtension i == RV64I

@@ -83,6 +83,7 @@ test-suite riscv-rig-test
     Test.Core.Decode
     Test.Core.Atomic
     Test.Core.FloatInstr
+    Test.Core.Compressed
     Test.Constraint.Solver
     Test.Generator.Random
     Test.Coverage.Accumulator

@@ -1,9 +1,10 @@
-module Core.Encode (encode) where
+module Core.Encode (encode, encode16) where
 
 import Core.Types
 import Core.Instruction
 import Data.Bits  (shiftL, shiftR, (.|.), (.&.))
-import Data.Word  (Word32)
+import Data.Int   (Int8)
+import Data.Word  (Word16, Word32)
 
 buildR :: Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> Word32
 buildR opcode rd funct3 rs1 rs2 funct7 =
@@ -278,3 +279,253 @@ encode = \case
   FLT_D     rd rs1 rs2 -> buildFPOp 0x51 (fr rs2) (fr rs1) 0x1 (r rd)
   FLE_D     rd rs1 rs2 -> buildFPOp 0x51 (fr rs2) (fr rs1) 0x0 (r rd)
   FCLASS_D  rd rs1     -> buildFPOp 0x71 0x00 (fr rs1) 0x1 (r rd)
+  -- RV64C instructions: encode via encode16
+  C_ADDI4SPN rd nzuimm -> fromIntegral (encode16 (C_ADDI4SPN rd nzuimm))
+  C_LW  a b c  -> fromIntegral (encode16 (C_LW  a b c))
+  C_LD  a b c  -> fromIntegral (encode16 (C_LD  a b c))
+  C_SW  a b c  -> fromIntegral (encode16 (C_SW  a b c))
+  C_SD  a b c  -> fromIntegral (encode16 (C_SD  a b c))
+  C_ADDI a b   -> fromIntegral (encode16 (C_ADDI a b))
+  C_ADDIW a b  -> fromIntegral (encode16 (C_ADDIW a b))
+  C_LI a b     -> fromIntegral (encode16 (C_LI a b))
+  C_ADDI16SP a -> fromIntegral (encode16 (C_ADDI16SP a))
+  C_LUI a b    -> fromIntegral (encode16 (C_LUI a b))
+  C_SRLI a b   -> fromIntegral (encode16 (C_SRLI a b))
+  C_SRAI a b   -> fromIntegral (encode16 (C_SRAI a b))
+  C_ANDI a b   -> fromIntegral (encode16 (C_ANDI a b))
+  C_SUB a b    -> fromIntegral (encode16 (C_SUB a b))
+  C_XOR a b    -> fromIntegral (encode16 (C_XOR a b))
+  C_OR  a b    -> fromIntegral (encode16 (C_OR  a b))
+  C_AND a b    -> fromIntegral (encode16 (C_AND a b))
+  C_SUBW a b   -> fromIntegral (encode16 (C_SUBW a b))
+  C_ADDW a b   -> fromIntegral (encode16 (C_ADDW a b))
+  C_J a        -> fromIntegral (encode16 (C_J a))
+  C_BEQZ a b   -> fromIntegral (encode16 (C_BEQZ a b))
+  C_BNEZ a b   -> fromIntegral (encode16 (C_BNEZ a b))
+  C_SLLI a b   -> fromIntegral (encode16 (C_SLLI a b))
+  C_LWSP a b   -> fromIntegral (encode16 (C_LWSP a b))
+  C_LDSP a b   -> fromIntegral (encode16 (C_LDSP a b))
+  C_JR a       -> fromIntegral (encode16 (C_JR a))
+  C_MV a b     -> fromIntegral (encode16 (C_MV a b))
+  C_EBREAK     -> fromIntegral (encode16 C_EBREAK)
+  C_JALR a     -> fromIntegral (encode16 (C_JALR a))
+  C_ADD a b    -> fromIntegral (encode16 (C_ADD a b))
+  C_SWSP a b   -> fromIntegral (encode16 (C_SWSP a b))
+  C_SDSP a b   -> fromIntegral (encode16 (C_SDSP a b))
+
+-- 3-bit compressed register encoding: x8→0, x9→1, ..., x15→7
+cr' :: Register -> Word16
+cr' (Register x) = fromIntegral (x .&. 0x7)
+
+-- Split signed 6-bit immediate into (bit5, bits4:0)
+splitImm6 :: Int8 -> (Word16, Word16)
+splitImm6 v =
+  let w = fromIntegral v .&. 0x3F :: Word16
+  in (w `shiftR` 5, w .&. 0x1F)
+
+-- Build RVC J-type: j[11|4|9:8|10|6|7|3:1|5]
+buildCJ :: Word16 -> Word16 -> Word16
+buildCJ funct3 target =
+  let t = target .&. 0x7FF
+      b11 = (t `shiftR` 11) .&. 0x1
+      b4  = (t `shiftR` 4)  .&. 0x1
+      b9  = (t `shiftR` 9)  .&. 0x1
+      b8  = (t `shiftR` 8)  .&. 0x1
+      b10 = (t `shiftR` 10) .&. 0x1
+      b6  = (t `shiftR` 6)  .&. 0x1
+      b7  = (t `shiftR` 7)  .&. 0x1
+      b3  = (t `shiftR` 3)  .&. 0x1
+      b2  = (t `shiftR` 2)  .&. 0x1
+      b1  = (t `shiftR` 1)  .&. 0x1
+      b5  = (t `shiftR` 5)  .&. 0x1
+      bits = (b11 `shiftL` 11) .|. (b4 `shiftL` 10) .|. (b9 `shiftL` 9)
+           .|. (b8 `shiftL` 8) .|. (b10 `shiftL` 7) .|. (b6 `shiftL` 6)
+           .|. (b7 `shiftL` 5) .|. (b3 `shiftL` 4)  .|. (b2 `shiftL` 3)
+           .|. (b1 `shiftL` 2) .|. (b5 `shiftL` 1)
+  in (funct3 `shiftL` 13) .|. (bits `shiftL` 2) .|. 0x1
+
+encode16 :: Instruction -> Word16
+encode16 = \case
+  -- Quadrant 00
+  C_ADDI4SPN rd nzuimm ->
+    let v = fromIntegral (unUImm10 nzuimm) :: Word16
+        -- nzuimm[5:4]→[12:11], [9:6]→[10:7], [2]→[6], [3]→[5]
+        bits = (((v `shiftR` 4) .&. 0x3) `shiftL` 11)
+             .|. (((v `shiftR` 6) .&. 0xF) `shiftL` 7)
+             .|. (((v `shiftR` 2) .&. 0x1) `shiftL` 6)
+             .|. (((v `shiftR` 3) .&. 0x1) `shiftL` 5)
+    in (0x0 `shiftL` 13) .|. bits .|. (cr' rd `shiftL` 2) .|. 0x0
+
+  C_LW rd rs1 uimm7 ->
+    -- uimm[5:3]→[12:10], [2]→[6], [6]→[5]
+    let v = fromIntegral (unUImm7 uimm7) :: Word16
+        bits = (((v `shiftR` 3) .&. 0x7) `shiftL` 10)
+             .|. (((v `shiftR` 2) .&. 0x1) `shiftL` 6)
+             .|. (((v `shiftR` 6) .&. 0x1) `shiftL` 5)
+    in (0x2 `shiftL` 13) .|. (cr' rs1 `shiftL` 7) .|. bits .|. (cr' rd `shiftL` 2) .|. 0x0
+
+  C_LD rd rs1 uimm8 ->
+    -- uimm[5:3]→[12:10], [7:6]→[6:5]
+    let v = fromIntegral (unUImm8 uimm8) :: Word16
+        bits = (((v `shiftR` 3) .&. 0x7) `shiftL` 10)
+             .|. (((v `shiftR` 6) .&. 0x3) `shiftL` 5)
+    in (0x3 `shiftL` 13) .|. (cr' rs1 `shiftL` 7) .|. bits .|. (cr' rd `shiftL` 2) .|. 0x0
+
+  C_SW rs1 rs2 uimm7 ->
+    let v = fromIntegral (unUImm7 uimm7) :: Word16
+        bits = (((v `shiftR` 3) .&. 0x7) `shiftL` 10)
+             .|. (((v `shiftR` 2) .&. 0x1) `shiftL` 6)
+             .|. (((v `shiftR` 6) .&. 0x1) `shiftL` 5)
+    in (0x6 `shiftL` 13) .|. (cr' rs1 `shiftL` 7) .|. bits .|. (cr' rs2 `shiftL` 2) .|. 0x0
+
+  C_SD rs1 rs2 uimm8 ->
+    let v = fromIntegral (unUImm8 uimm8) :: Word16
+        bits = (((v `shiftR` 3) .&. 0x7) `shiftL` 10)
+             .|. (((v `shiftR` 6) .&. 0x3) `shiftL` 5)
+    in (0x7 `shiftL` 13) .|. (cr' rs1 `shiftL` 7) .|. bits .|. (cr' rs2 `shiftL` 2) .|. 0x0
+
+  -- Quadrant 01
+  C_ADDI rd imm6 ->
+    let (b5, b4_0) = splitImm6 (fromIntegral (unImm6 imm6))
+    in (0x0 `shiftL` 13) .|. (b5 `shiftL` 12)
+       .|. (fromIntegral (unReg rd) `shiftL` 7)
+       .|. (b4_0 `shiftL` 2) .|. 0x1
+
+  C_ADDIW rd imm6 ->
+    let (b5, b4_0) = splitImm6 (fromIntegral (unImm6 imm6))
+    in (0x1 `shiftL` 13) .|. (b5 `shiftL` 12)
+       .|. (fromIntegral (unReg rd) `shiftL` 7)
+       .|. (b4_0 `shiftL` 2) .|. 0x1
+
+  C_LI rd imm6 ->
+    let (b5, b4_0) = splitImm6 (fromIntegral (unImm6 imm6))
+    in (0x2 `shiftL` 13) .|. (b5 `shiftL` 12)
+       .|. (fromIntegral (unReg rd) `shiftL` 7)
+       .|. (b4_0 `shiftL` 2) .|. 0x1
+
+  C_ADDI16SP imm10 ->
+    -- nzimm[9]→[12], nzimm[4]→[6], nzimm[6]→[5], nzimm[8:7]→[4:3], nzimm[5]→[2]
+    let v = fromIntegral (unImm10 imm10) :: Word16
+        b9 = (v `shiftR` 9) .&. 0x1
+        b4 = (v `shiftR` 4) .&. 0x1
+        b6 = (v `shiftR` 6) .&. 0x1
+        b8 = (v `shiftR` 8) .&. 0x1
+        b7 = (v `shiftR` 7) .&. 0x1
+        b5 = (v `shiftR` 5) .&. 0x1
+        bits = (b4 `shiftL` 4) .|. (b6 `shiftL` 3) .|. (b8 `shiftL` 2)
+             .|. (b7 `shiftL` 1) .|. b5
+    in (0x3 `shiftL` 13) .|. (b9 `shiftL` 12) .|. (0x2 `shiftL` 7)
+       .|. (bits `shiftL` 2) .|. 0x1
+
+  C_LUI rd imm6 ->
+    let (b5, b4_0) = splitImm6 (fromIntegral (unImm6 imm6))
+    in (0x3 `shiftL` 13) .|. (b5 `shiftL` 12)
+       .|. (fromIntegral (unReg rd) `shiftL` 7)
+       .|. (b4_0 `shiftL` 2) .|. 0x1
+
+  C_SRLI rd uimm6 ->
+    let v = fromIntegral (unUImm6 uimm6) :: Word16
+    in (0x4 `shiftL` 13) .|. ((v `shiftR` 5) `shiftL` 12)
+       .|. (0x0 `shiftL` 10) .|. (cr' rd `shiftL` 7)
+       .|. ((v .&. 0x1F) `shiftL` 2) .|. 0x1
+
+  C_SRAI rd uimm6 ->
+    let v = fromIntegral (unUImm6 uimm6) :: Word16
+    in (0x4 `shiftL` 13) .|. ((v `shiftR` 5) `shiftL` 12)
+       .|. (0x1 `shiftL` 10) .|. (cr' rd `shiftL` 7)
+       .|. ((v .&. 0x1F) `shiftL` 2) .|. 0x1
+
+  C_ANDI rd imm6 ->
+    let (b5, b4_0) = splitImm6 (fromIntegral (unImm6 imm6))
+    in (0x4 `shiftL` 13) .|. (b5 `shiftL` 12) .|. (0x2 `shiftL` 10)
+       .|. (cr' rd `shiftL` 7) .|. (b4_0 `shiftL` 2) .|. 0x1
+
+  C_SUB  rd rs2 -> (0x4 `shiftL` 13) .|. (0x3 `shiftL` 10) .|. (cr' rd `shiftL` 7) .|. (0x0 `shiftL` 5) .|. (cr' rs2 `shiftL` 2) .|. 0x1
+  C_XOR  rd rs2 -> (0x4 `shiftL` 13) .|. (0x3 `shiftL` 10) .|. (cr' rd `shiftL` 7) .|. (0x1 `shiftL` 5) .|. (cr' rs2 `shiftL` 2) .|. 0x1
+  C_OR   rd rs2 -> (0x4 `shiftL` 13) .|. (0x3 `shiftL` 10) .|. (cr' rd `shiftL` 7) .|. (0x2 `shiftL` 5) .|. (cr' rs2 `shiftL` 2) .|. 0x1
+  C_AND  rd rs2 -> (0x4 `shiftL` 13) .|. (0x3 `shiftL` 10) .|. (cr' rd `shiftL` 7) .|. (0x3 `shiftL` 5) .|. (cr' rs2 `shiftL` 2) .|. 0x1
+  C_SUBW rd rs2 -> (0x4 `shiftL` 13) .|. (0x1 `shiftL` 12) .|. (0x3 `shiftL` 10) .|. (cr' rd `shiftL` 7) .|. (0x0 `shiftL` 5) .|. (cr' rs2 `shiftL` 2) .|. 0x1
+  C_ADDW rd rs2 -> (0x4 `shiftL` 13) .|. (0x1 `shiftL` 12) .|. (0x3 `shiftL` 10) .|. (cr' rd `shiftL` 7) .|. (0x1 `shiftL` 5) .|. (cr' rs2 `shiftL` 2) .|. 0x1
+
+  C_J imm12 ->
+    buildCJ 0x5 (fromIntegral (unImm12 imm12) .&. 0x7FF)
+
+  C_BEQZ rs1 imm9 ->
+    let v = fromIntegral (unImm9 imm9) :: Word16
+        b8   = (v `shiftR` 8) .&. 0x1
+        b4_3 = (v `shiftR` 3) .&. 0x3
+        b7_6 = (v `shiftR` 6) .&. 0x3
+        b2_1 = (v `shiftR` 1) .&. 0x3
+        b5   = (v `shiftR` 5) .&. 0x1
+    in (0x6 `shiftL` 13) .|. (b8 `shiftL` 12) .|. (b4_3 `shiftL` 10)
+       .|. (cr' rs1 `shiftL` 7) .|. (b7_6 `shiftL` 5) .|. (b2_1 `shiftL` 3)
+       .|. (b5 `shiftL` 2) .|. 0x1
+
+  C_BNEZ rs1 imm9 ->
+    let v = fromIntegral (unImm9 imm9) :: Word16
+        b8   = (v `shiftR` 8) .&. 0x1
+        b4_3 = (v `shiftR` 3) .&. 0x3
+        b7_6 = (v `shiftR` 6) .&. 0x3
+        b2_1 = (v `shiftR` 1) .&. 0x3
+        b5   = (v `shiftR` 5) .&. 0x1
+    in (0x7 `shiftL` 13) .|. (b8 `shiftL` 12) .|. (b4_3 `shiftL` 10)
+       .|. (cr' rs1 `shiftL` 7) .|. (b7_6 `shiftL` 5) .|. (b2_1 `shiftL` 3)
+       .|. (b5 `shiftL` 2) .|. 0x1
+
+  -- Quadrant 10
+  C_SLLI rd uimm6 ->
+    let v = fromIntegral (unUImm6 uimm6) :: Word16
+    in (0x0 `shiftL` 13) .|. ((v `shiftR` 5) `shiftL` 12)
+       .|. (fromIntegral (unReg rd) `shiftL` 7)
+       .|. ((v .&. 0x1F) `shiftL` 2) .|. 0x2
+
+  C_LWSP rd uimm8 ->
+    let v = fromIntegral (unUImm8 uimm8) :: Word16
+        b5   = (v `shiftR` 5) .&. 0x1
+        b4_2 = (v `shiftR` 2) .&. 0x7
+        b7_6 = (v `shiftR` 6) .&. 0x3
+    in (0x2 `shiftL` 13) .|. (b5 `shiftL` 12)
+       .|. (fromIntegral (unReg rd) `shiftL` 7)
+       .|. (b4_2 `shiftL` 4) .|. (b7_6 `shiftL` 2) .|. 0x2
+
+  C_LDSP rd uimm9 ->
+    let v = fromIntegral (unUImm9 uimm9) :: Word16
+        b5   = (v `shiftR` 5) .&. 0x1
+        b4_3 = (v `shiftR` 3) .&. 0x3
+        b8_6 = (v `shiftR` 6) .&. 0x7
+    in (0x3 `shiftL` 13) .|. (b5 `shiftL` 12)
+       .|. (fromIntegral (unReg rd) `shiftL` 7)
+       .|. (b4_3 `shiftL` 5) .|. (b8_6 `shiftL` 2) .|. 0x2
+
+  C_JR    rs1    -> (0x4 `shiftL` 13) .|. (0x0 `shiftL` 12)
+                    .|. (fromIntegral (unReg rs1) `shiftL` 7) .|. 0x2
+
+  C_MV    rd rs2 -> (0x4 `shiftL` 13) .|. (0x0 `shiftL` 12)
+                    .|. (fromIntegral (unReg rd) `shiftL` 7)
+                    .|. (fromIntegral (unReg rs2) `shiftL` 2) .|. 0x2
+
+  C_EBREAK       -> (0x4 `shiftL` 13) .|. (0x1 `shiftL` 12) .|. 0x2
+
+  C_JALR  rs1    -> (0x4 `shiftL` 13) .|. (0x1 `shiftL` 12)
+                    .|. (fromIntegral (unReg rs1) `shiftL` 7) .|. 0x2
+
+  C_ADD   rd rs2 -> (0x4 `shiftL` 13) .|. (0x1 `shiftL` 12)
+                    .|. (fromIntegral (unReg rd) `shiftL` 7)
+                    .|. (fromIntegral (unReg rs2) `shiftL` 2) .|. 0x2
+
+  C_SWSP  rs2 uimm8 ->
+    let v = fromIntegral (unUImm8 uimm8) :: Word16
+        b5_2 = (v `shiftR` 2) .&. 0xF
+        b7_6 = (v `shiftR` 6) .&. 0x3
+    in (0x6 `shiftL` 13) .|. (b5_2 `shiftL` 9) .|. (b7_6 `shiftL` 7)
+       .|. (fromIntegral (unReg rs2) `shiftL` 2) .|. 0x2
+
+  C_SDSP  rs2 uimm9 ->
+    let v = fromIntegral (unUImm9 uimm9) :: Word16
+        b5_3 = (v `shiftR` 3) .&. 0x7
+        b8_6 = (v `shiftR` 6) .&. 0x7
+    in (0x7 `shiftL` 13) .|. (b5_3 `shiftL` 10) .|. (b8_6 `shiftL` 7)
+       .|. (fromIntegral (unReg rs2) `shiftL` 2) .|. 0x2
+
+  -- Fallback: non-compressed instruction; take low 16 bits of 32-bit encoding
+  other -> fromIntegral (encode other .&. 0xFFFF)

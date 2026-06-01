@@ -1,13 +1,14 @@
 module Core.Decode
   ( decode
+  , decode16
   , DecodeError(..)
   ) where
 
 import Core.Types
 import Core.Instruction
 import Data.Bits  (shiftL, shiftR, (.|.), (.&.), testBit)
-import Data.Word  (Word32)
-import Data.Int   (Int16, Int32)
+import Data.Word  (Word16, Word32)
+import Data.Int   (Int8, Int16, Int32)
 
 data DecodeError
   = UnknownOpcode     Word32
@@ -378,3 +379,204 @@ decodeFPOp w =
     (0x71, 1, 0)  -> Right $ FCLASS_D  rdi rs1f
     (0x79, 0, 0)  -> Right $ FMV_D_X   rd_ rs1i
     _             -> Left  $ UnknownFunct7 0x53 f3 f7
+
+-- Helper: 3-bit compressed register field → Register (0→x8, 7→x15)
+mkCReg :: Word16 -> Register
+mkCReg x = Register (fromIntegral x + 8)
+
+cField :: Word16 -> Int -> Int -> Word16
+cField w hi lo = (w `shiftR` lo) .&. ((1 `shiftL` (hi - lo + 1)) - 1)
+
+signExt6C :: Word16 -> Int8
+signExt6C v =
+  let raw = fromIntegral (v .&. 0x3F) :: Int8
+  in if raw .&. 0x20 /= 0 then raw - 64 else raw
+
+decode16 :: Word16 -> Either DecodeError Instruction
+decode16 w =
+  let quad   = w .&. 0x3
+      funct3 = cField w 15 13
+  in case quad of
+    0x0 -> decodeQ0 w funct3
+    0x1 -> decodeQ1 w funct3
+    0x2 -> decodeQ2 w funct3
+    _   -> Left (ReservedEncoding (fromIntegral w))
+
+decodeQ0 :: Word16 -> Word16 -> Either DecodeError Instruction
+decodeQ0 w funct3 =
+  let rd'_  = mkCReg (cField w 4 2)
+      rs1'_ = mkCReg (cField w 9 7)
+      rs2'_ = mkCReg (cField w 4 2)
+  in case funct3 of
+    0x0 ->
+      -- C.ADDI4SPN: nzuimm[5:4]→[12:11],[9:6]→[10:7],[2]→[6],[3]→[5]
+      let b5_4 = cField w 12 11
+          b9_6 = cField w 10 7
+          b2   = cField w 6 6
+          b3   = cField w 5 5
+          nzuimm = (b9_6 `shiftL` 6) .|. (b5_4 `shiftL` 4) .|. (b3 `shiftL` 3) .|. (b2 `shiftL` 2)
+      in Right $ C_ADDI4SPN rd'_ (UImm10 nzuimm)
+    0x2 ->
+      -- C.LW: uimm[5:3]→[12:10],[2]→[6],[6]→[5]
+      let b5_3 = cField w 12 10
+          b2   = cField w 6 6
+          b6   = cField w 5 5
+          uimm = (b6 `shiftL` 6) .|. (b5_3 `shiftL` 3) .|. (b2 `shiftL` 2)
+      in Right $ C_LW rd'_ rs1'_ (UImm7 (fromIntegral uimm))
+    0x3 ->
+      -- C.LD: uimm[5:3]→[12:10],[7:6]→[6:5]
+      let b5_3 = cField w 12 10
+          b7_6 = cField w 6 5
+          uimm = (b7_6 `shiftL` 6) .|. (b5_3 `shiftL` 3)
+      in Right $ C_LD rd'_ rs1'_ (UImm8 (fromIntegral uimm))
+    0x6 ->
+      -- C.SW: same bit layout as C.LW but stores
+      let b5_3 = cField w 12 10
+          b2   = cField w 6 6
+          b6   = cField w 5 5
+          uimm = (b6 `shiftL` 6) .|. (b5_3 `shiftL` 3) .|. (b2 `shiftL` 2)
+      in Right $ C_SW rs1'_ rs2'_ (UImm7 (fromIntegral uimm))
+    0x7 ->
+      -- C.SD: same as C.LD but stores
+      let b5_3 = cField w 12 10
+          b7_6 = cField w 6 5
+          uimm = (b7_6 `shiftL` 6) .|. (b5_3 `shiftL` 3)
+      in Right $ C_SD rs1'_ rs2'_ (UImm8 (fromIntegral uimm))
+    f   -> Left (UnknownFunct3 0x0 (fromIntegral f))
+
+decodeQ1 :: Word16 -> Word16 -> Either DecodeError Instruction
+decodeQ1 w funct3 =
+  let rdrs1  = Register (fromIntegral (cField w 11 7))
+      rd'c   = mkCReg (cField w 9 7)
+      rs2'c  = mkCReg (cField w 4 2)
+      rawImm6 = (cField w 12 12 `shiftL` 5) .|. cField w 6 2
+      imm6    = Imm6 (signExt6C rawImm6)
+  in case funct3 of
+    0x0 -> Right $ C_ADDI rdrs1 imm6
+    0x1 -> Right $ C_ADDIW rdrs1 imm6
+    0x2 -> Right $ C_LI rdrs1 imm6
+    0x3 ->
+      let rd5 = cField w 11 7
+      in if rd5 == 2
+         then
+           -- C.ADDI16SP: nzimm[9]→[12],[4]→[6],[6]→[5],[8:7]→[4:3],[5]→[2]
+           let b9   = cField w 12 12
+               b4   = cField w 6 6
+               b6   = cField w 5 5
+               b8_7 = cField w 4 3
+               b5   = cField w 2 2
+               nzimm = (b9 `shiftL` 9) .|. (b8_7 `shiftL` 7) .|. (b6 `shiftL` 6)
+                     .|. (b5 `shiftL` 5) .|. (b4 `shiftL` 4)
+               sv = fromIntegral (if nzimm .&. 0x200 /= 0 then fromIntegral nzimm - (0x400 :: Int) else fromIntegral nzimm) :: Int16
+           in Right $ C_ADDI16SP (Imm10 sv)
+         else Right $ C_LUI rdrs1 imm6
+    0x4 ->
+      let funct2 = cField w 11 10
+          bit12  = cField w 12 12
+          rawSh  = (bit12 `shiftL` 5) .|. cField w 6 2
+      in case (funct2, bit12) of
+        (0x0, _) -> Right $ C_SRLI rd'c (UImm6 (fromIntegral rawSh))
+        (0x1, _) -> Right $ C_SRAI rd'c (UImm6 (fromIntegral rawSh))
+        (0x2, _) -> Right $ C_ANDI rd'c (Imm6 (signExt6C rawSh))
+        (0x3, 0) ->
+          let sub3 = cField w 6 5
+          in case sub3 of
+            0x0 -> Right $ C_SUB  rd'c rs2'c
+            0x1 -> Right $ C_XOR  rd'c rs2'c
+            0x2 -> Right $ C_OR   rd'c rs2'c
+            0x3 -> Right $ C_AND  rd'c rs2'c
+            _   -> Left (ReservedEncoding (fromIntegral w))
+        (0x3, 1) ->
+          let sub3 = cField w 6 5
+          in case sub3 of
+            0x0 -> Right $ C_SUBW rd'c rs2'c
+            0x1 -> Right $ C_ADDW rd'c rs2'c
+            _   -> Left (ReservedEncoding (fromIntegral w))
+        _ -> Left (ReservedEncoding (fromIntegral w))
+    0x5 ->
+      -- C.J: j[11]|j[4]|j[9:8]|j[10]|j[6]|j[7]|j[3:1]|j[5] in bits[12:2]
+      let raw  = cField w 12 2   -- 11-bit value
+          b11  = (raw `shiftR` 10) .&. 0x1
+          b4   = (raw `shiftR` 9)  .&. 0x1
+          b9_8 = (raw `shiftR` 7)  .&. 0x3
+          b10  = (raw `shiftR` 6)  .&. 0x1
+          b6   = (raw `shiftR` 5)  .&. 0x1
+          b7   = (raw `shiftR` 4)  .&. 0x1
+          b3_1 = (raw `shiftR` 1)  .&. 0x7
+          b5   = raw               .&. 0x1
+          target = (b11 `shiftL` 11) .|. (b10 `shiftL` 10) .|. (b9_8 `shiftL` 8)
+                 .|. (b7 `shiftL` 7)  .|. (b6 `shiftL` 6)  .|. (b5 `shiftL` 5)
+                 .|. (b4 `shiftL` 4)  .|. (b3_1 `shiftL` 1)
+          sv = fromIntegral (if b11 /= 0 then fromIntegral target - (0x1000 :: Int) else fromIntegral target) :: Int16
+      in Right $ C_J (Imm12 sv)
+    0x6 ->
+      -- C.BEQZ: offset[8]→[12],[4:3]→[11:10],[7:6]→[6:5],[2:1]→[4:3],[5]→[2]
+      let rs1c = mkCReg (cField w 9 7)
+          b8   = cField w 12 12
+          b4_3 = cField w 11 10
+          b7_6 = cField w 6 5
+          b2_1 = cField w 4 3
+          b5   = cField w 2 2
+          v    = (b8 `shiftL` 8) .|. (b7_6 `shiftL` 6) .|. (b5 `shiftL` 5)
+               .|. (b4_3 `shiftL` 3) .|. (b2_1 `shiftL` 1)
+          sv   = fromIntegral (if b8 /= 0 then fromIntegral v - (0x200 :: Int) else fromIntegral v) :: Int16
+      in Right $ C_BEQZ rs1c (Imm9 sv)
+    0x7 ->
+      let rs1c = mkCReg (cField w 9 7)
+          b8   = cField w 12 12
+          b4_3 = cField w 11 10
+          b7_6 = cField w 6 5
+          b2_1 = cField w 4 3
+          b5   = cField w 2 2
+          v    = (b8 `shiftL` 8) .|. (b7_6 `shiftL` 6) .|. (b5 `shiftL` 5)
+               .|. (b4_3 `shiftL` 3) .|. (b2_1 `shiftL` 1)
+          sv   = fromIntegral (if b8 /= 0 then fromIntegral v - (0x200 :: Int) else fromIntegral v) :: Int16
+      in Right $ C_BNEZ rs1c (Imm9 sv)
+    f   -> Left (UnknownFunct3 0x1 (fromIntegral f))
+
+decodeQ2 :: Word16 -> Word16 -> Either DecodeError Instruction
+decodeQ2 w funct3 =
+  let rdrs1 = Register (fromIntegral (cField w 11 7))
+      rs2   = Register (fromIntegral (cField w 6 2))
+      bit12 = cField w 12 12
+  in case funct3 of
+    0x0 ->
+      -- C.SLLI: shamt[5]→[12], shamt[4:0]→[6:2]
+      let shamt = (bit12 `shiftL` 5) .|. cField w 6 2
+      in Right $ C_SLLI rdrs1 (UImm6 (fromIntegral shamt))
+    0x2 ->
+      -- C.LWSP: uimm[5]→[12], uimm[4:2]→[6:4], uimm[7:6]→[3:2]
+      let b5   = bit12
+          b4_2 = cField w 6 4
+          b7_6 = cField w 3 2
+          uimm = (b7_6 `shiftL` 6) .|. (b5 `shiftL` 5) .|. (b4_2 `shiftL` 2)
+      in Right $ C_LWSP rdrs1 (UImm8 (fromIntegral uimm))
+    0x3 ->
+      -- C.LDSP: uimm[5]→[12], uimm[4:3]→[6:5], uimm[8:6]→[4:2]
+      let b5   = bit12
+          b4_3 = cField w 6 5
+          b8_6 = cField w 4 2
+          uimm = (b8_6 `shiftL` 6) .|. (b5 `shiftL` 5) .|. (b4_3 `shiftL` 3)
+      in Right $ C_LDSP rdrs1 (UImm9 (fromIntegral uimm))
+    0x4 ->
+      let rs2val = fromIntegral (cField w 6 2) :: Int
+      in case (bit12, unReg rdrs1, rs2val) of
+        (0, _, 0) -> Right $ C_JR rdrs1
+        (0, _, _) -> Right $ C_MV rdrs1 rs2
+        (1, 0, 0) -> Right C_EBREAK
+        (1, _, 0) -> Right $ C_JALR rdrs1
+        (1, _, _) -> Right $ C_ADD rdrs1 rs2
+        _         -> Left (ReservedEncoding (fromIntegral w))
+    0x6 ->
+      -- C.SWSP: uimm[5:2]→[12:9], uimm[7:6]→[8:7]
+      let b5_2 = cField w 12 9
+          b7_6 = cField w 8 7
+          uimm = (b7_6 `shiftL` 6) .|. (b5_2 `shiftL` 2)
+      in Right $ C_SWSP rs2 (UImm8 (fromIntegral uimm))
+    0x7 ->
+      -- C.SDSP: uimm[5:3]→[12:10], uimm[8:6]→[9:7]
+      let b5_3 = cField w 12 10
+          b8_6 = cField w 9 7
+          uimm = (b8_6 `shiftL` 6) .|. (b5_3 `shiftL` 3)
+      in Right $ C_SDSP rs2 (UImm9 (fromIntegral uimm))
+    f   -> Left (UnknownFunct3 0x2 (fromIntegral f))
