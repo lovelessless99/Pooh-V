@@ -2,7 +2,7 @@
   description = "riscv-rig: RISC-V Random Instruction Generator with SMT constraint solving";
 
   nixConfig = {
-    allow-import-from-derivation = "true";
+    allow-import-from-derivation = true;
   };
 
   inputs = {

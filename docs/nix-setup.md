@@ -65,6 +65,8 @@ cd ~/riscv-rig
 
 ## 4. 填入 Spike 的 Nix hash（只需做一次）
 
+> **為什麼自己建 Spike？** nixpkgs 24.11 stable 沒有收錄 Spike，因此 `nix/spike.nix` 從 riscv-isa-sim v1.1.1 原始碼編譯。
+
 `nix/spike.nix` 中的 hash 欄位目前是 placeholder，需要在 WSL2 中計算真實值：
 
 ```bash
