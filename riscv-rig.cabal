@@ -81,6 +81,7 @@ test-suite riscv-rig-test
   other-modules:
     Test.Core.Encode
     Test.Core.Decode
+    Test.Core.Atomic
     Test.Constraint.Solver
     Test.Generator.Random
     Test.Coverage.Accumulator

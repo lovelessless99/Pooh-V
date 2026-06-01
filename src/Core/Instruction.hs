@@ -120,6 +120,31 @@ data Instruction
   | SRET
   | WFI
   | SFENCE_VMA Register Register      -- rs1=vaddr, rs2=asid
+  -- ── RV64A: Load-Reserved / Store-Conditional ────────────────────
+  | LR_W      Register Register AqRl          -- rd rs1 aqrl
+  | LR_D      Register Register AqRl
+  | SC_W      Register Register Register AqRl  -- rd rs1 rs2 aqrl
+  | SC_D      Register Register Register AqRl
+  -- ── RV64A: Atomic Memory Operations (word) ─────────────────────
+  | AMOSWAP_W Register Register Register AqRl  -- rd rs1 rs2 aqrl
+  | AMOADD_W  Register Register Register AqRl
+  | AMOXOR_W  Register Register Register AqRl
+  | AMOAND_W  Register Register Register AqRl
+  | AMOOR_W   Register Register Register AqRl
+  | AMOMIN_W  Register Register Register AqRl
+  | AMOMAX_W  Register Register Register AqRl
+  | AMOMINU_W Register Register Register AqRl
+  | AMOMAXU_W Register Register Register AqRl
+  -- ── RV64A: Atomic Memory Operations (double) ───────────────────
+  | AMOSWAP_D Register Register Register AqRl
+  | AMOADD_D  Register Register Register AqRl
+  | AMOXOR_D  Register Register Register AqRl
+  | AMOAND_D  Register Register Register AqRl
+  | AMOOR_D   Register Register Register AqRl
+  | AMOMIN_D  Register Register Register AqRl
+  | AMOMAX_D  Register Register Register AqRl
+  | AMOMINU_D Register Register Register AqRl
+  | AMOMAXU_D Register Register Register AqRl
   deriving (Show, Eq, Ord, Generic)
 
 instrExtension :: Instruction -> Extension
@@ -129,6 +154,14 @@ instrExtension instr = case instr of
   MULW{}   -> RV64M; DIVW{}   -> RV64M; DIVUW{}   -> RV64M; REMW{}   -> RV64M
   REMUW{}  -> RV64M
   MRET     -> RVPriv; SRET -> RVPriv; WFI -> RVPriv; SFENCE_VMA{} -> RVPriv
+  LR_W{} -> RV64A; LR_D{} -> RV64A
+  SC_W{} -> RV64A; SC_D{} -> RV64A
+  AMOSWAP_W{} -> RV64A; AMOADD_W{}  -> RV64A; AMOXOR_W{}  -> RV64A
+  AMOAND_W{}  -> RV64A; AMOOR_W{}   -> RV64A; AMOMIN_W{}  -> RV64A
+  AMOMAX_W{}  -> RV64A; AMOMINU_W{} -> RV64A; AMOMAXU_W{} -> RV64A
+  AMOSWAP_D{} -> RV64A; AMOADD_D{}  -> RV64A; AMOXOR_D{}  -> RV64A
+  AMOAND_D{}  -> RV64A; AMOOR_D{}   -> RV64A; AMOMIN_D{}  -> RV64A
+  AMOMAX_D{}  -> RV64A; AMOMINU_D{} -> RV64A; AMOMAXU_D{} -> RV64A
   _        -> RV64I
 
 instrFormat :: Instruction -> InstrFormat
@@ -151,6 +184,14 @@ instrFormat = \case
   CSRRWI{} -> IFormat; CSRRSI{} -> IFormat; CSRRCI{} -> IFormat
   ECALL -> IFormat; EBREAK -> IFormat; FENCE{} -> IFormat; FENCE_I -> IFormat
   MRET -> RFormat; SRET -> RFormat; WFI -> RFormat; SFENCE_VMA{} -> RFormat
+  LR_W{} -> RFormat; LR_D{} -> RFormat
+  SC_W{} -> RFormat; SC_D{} -> RFormat
+  AMOSWAP_W{} -> RFormat; AMOADD_W{}  -> RFormat; AMOXOR_W{}  -> RFormat
+  AMOAND_W{}  -> RFormat; AMOOR_W{}   -> RFormat; AMOMIN_W{}  -> RFormat
+  AMOMAX_W{}  -> RFormat; AMOMINU_W{} -> RFormat; AMOMAXU_W{} -> RFormat
+  AMOSWAP_D{} -> RFormat; AMOADD_D{}  -> RFormat; AMOXOR_D{}  -> RFormat
+  AMOAND_D{}  -> RFormat; AMOOR_D{}   -> RFormat; AMOMIN_D{}  -> RFormat
+  AMOMAX_D{}  -> RFormat; AMOMINU_D{} -> RFormat; AMOMAXU_D{} -> RFormat
   SB{} -> SFormat; SH{} -> SFormat; SW{} -> SFormat; SD{} -> SFormat
   BEQ{} -> BFormat; BNE{} -> BFormat; BLT{} -> BFormat; BGE{} -> BFormat
   BLTU{} -> BFormat; BGEU{} -> BFormat

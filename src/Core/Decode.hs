@@ -86,6 +86,7 @@ decode w = case opcode w of
   0x67 -> Right $ JALR  (mkReg (rd' w)) (mkReg (rs1' w)) (Imm12 (signExt12 (field w 31 20)))
   0x73 -> decodeSystem w
   0x0F -> decodeFence w
+  0x2F -> decodeAMO w
   op   -> Left (UnknownOpcode op)
 
 decodeR33 :: Word32 -> Either DecodeError Instruction
@@ -229,3 +230,43 @@ decodeFence w = case funct3' w of
     in Right $ FENCE pre suc
   0x1 -> Right FENCE_I
   f3  -> Left (UnknownFunct3 (opcode w) f3)
+
+decodeAqRl :: Word32 -> AqRl
+decodeAqRl w = case (field w 26 26, field w 25 25) of
+  (0, 0) -> AqRlNone
+  (0, 1) -> AqRlRelease
+  (1, 0) -> AqRlAcquire
+  _      -> AqRlAcqRel
+
+decodeAMO :: Word32 -> Either DecodeError Instruction
+decodeAMO w =
+  let funct5 = field w 31 27
+      funct3 = funct3' w
+      rd_    = mkReg (rd' w)
+      rs1_   = mkReg (rs1' w)
+      rs2_   = mkReg (rs2' w)
+      aqrl   = decodeAqRl w
+  in case (funct3, funct5) of
+    (0x2, 0x02) -> Right $ LR_W  rd_ rs1_ aqrl
+    (0x3, 0x02) -> Right $ LR_D  rd_ rs1_ aqrl
+    (0x2, 0x03) -> Right $ SC_W  rd_ rs1_ rs2_ aqrl
+    (0x3, 0x03) -> Right $ SC_D  rd_ rs1_ rs2_ aqrl
+    (0x2, 0x01) -> Right $ AMOSWAP_W rd_ rs1_ rs2_ aqrl
+    (0x2, 0x00) -> Right $ AMOADD_W  rd_ rs1_ rs2_ aqrl
+    (0x2, 0x04) -> Right $ AMOXOR_W  rd_ rs1_ rs2_ aqrl
+    (0x2, 0x0C) -> Right $ AMOAND_W  rd_ rs1_ rs2_ aqrl
+    (0x2, 0x08) -> Right $ AMOOR_W   rd_ rs1_ rs2_ aqrl
+    (0x2, 0x10) -> Right $ AMOMIN_W  rd_ rs1_ rs2_ aqrl
+    (0x2, 0x14) -> Right $ AMOMAX_W  rd_ rs1_ rs2_ aqrl
+    (0x2, 0x18) -> Right $ AMOMINU_W rd_ rs1_ rs2_ aqrl
+    (0x2, 0x1C) -> Right $ AMOMAXU_W rd_ rs1_ rs2_ aqrl
+    (0x3, 0x01) -> Right $ AMOSWAP_D rd_ rs1_ rs2_ aqrl
+    (0x3, 0x00) -> Right $ AMOADD_D  rd_ rs1_ rs2_ aqrl
+    (0x3, 0x04) -> Right $ AMOXOR_D  rd_ rs1_ rs2_ aqrl
+    (0x3, 0x0C) -> Right $ AMOAND_D  rd_ rs1_ rs2_ aqrl
+    (0x3, 0x08) -> Right $ AMOOR_D   rd_ rs1_ rs2_ aqrl
+    (0x3, 0x10) -> Right $ AMOMIN_D  rd_ rs1_ rs2_ aqrl
+    (0x3, 0x14) -> Right $ AMOMAX_D  rd_ rs1_ rs2_ aqrl
+    (0x3, 0x18) -> Right $ AMOMINU_D rd_ rs1_ rs2_ aqrl
+    (0x3, 0x1C) -> Right $ AMOMAXU_D rd_ rs1_ rs2_ aqrl
+    _           -> Left  $ UnknownFunct3 0x2F funct3

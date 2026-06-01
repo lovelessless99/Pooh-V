@@ -76,6 +76,20 @@ u5 (UImm5 x) = fromIntegral x
 u6 :: UImm6 -> Word32
 u6 (UImm6 x) = fromIntegral x
 
+encodeAqRl :: AqRl -> (Word32, Word32)  -- (aq, rl)
+encodeAqRl AqRlNone    = (0, 0)
+encodeAqRl AqRlRelease = (0, 1)
+encodeAqRl AqRlAcquire = (1, 0)
+encodeAqRl AqRlAcqRel  = (1, 1)
+
+-- Atomic Memory Operation: opcode=0x2F
+-- funct5 aq rl rs2 rs1 funct3 rd
+buildAMO :: Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> Word32
+buildAMO funct5 aq rl rs2W rs1W funct3 rdW =
+  (funct5 `shiftL` 27) .|. (aq `shiftL` 26) .|. (rl `shiftL` 25)
+  .|. (rs2W `shiftL` 20) .|. (rs1W `shiftL` 15)
+  .|. (funct3 `shiftL` 12) .|. (rdW `shiftL` 7) .|. 0x2F
+
 encode :: Instruction -> Word32
 encode = \case
   ADD  rd rs1 rs2 -> buildR 0x33 (r rd) 0x0 (r rs1) (r rs2) 0x00
@@ -158,3 +172,26 @@ encode = \case
   SRET -> buildR 0x73 0 0 0 2 0x08
   WFI  -> buildR 0x73 0 0 0 5 0x08
   SFENCE_VMA rs1 rs2 -> buildR 0x73 0 0 (r rs1) (r rs2) 0x09
+  -- ── RV64A ─────────────────────────────────────────────────────
+  LR_W  rd rs1 aq     -> let (a,l) = encodeAqRl aq in buildAMO 0x02 a l 0        (r rs1) 0x2 (r rd)
+  LR_D  rd rs1 aq     -> let (a,l) = encodeAqRl aq in buildAMO 0x02 a l 0        (r rs1) 0x3 (r rd)
+  SC_W  rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x03 a l (r rs2) (r rs1) 0x2 (r rd)
+  SC_D  rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x03 a l (r rs2) (r rs1) 0x3 (r rd)
+  AMOSWAP_W rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x01 a l (r rs2) (r rs1) 0x2 (r rd)
+  AMOADD_W  rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x00 a l (r rs2) (r rs1) 0x2 (r rd)
+  AMOXOR_W  rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x04 a l (r rs2) (r rs1) 0x2 (r rd)
+  AMOAND_W  rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x0C a l (r rs2) (r rs1) 0x2 (r rd)
+  AMOOR_W   rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x08 a l (r rs2) (r rs1) 0x2 (r rd)
+  AMOMIN_W  rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x10 a l (r rs2) (r rs1) 0x2 (r rd)
+  AMOMAX_W  rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x14 a l (r rs2) (r rs1) 0x2 (r rd)
+  AMOMINU_W rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x18 a l (r rs2) (r rs1) 0x2 (r rd)
+  AMOMAXU_W rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x1C a l (r rs2) (r rs1) 0x2 (r rd)
+  AMOSWAP_D rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x01 a l (r rs2) (r rs1) 0x3 (r rd)
+  AMOADD_D  rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x00 a l (r rs2) (r rs1) 0x3 (r rd)
+  AMOXOR_D  rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x04 a l (r rs2) (r rs1) 0x3 (r rd)
+  AMOAND_D  rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x0C a l (r rs2) (r rs1) 0x3 (r rd)
+  AMOOR_D   rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x08 a l (r rs2) (r rs1) 0x3 (r rd)
+  AMOMIN_D  rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x10 a l (r rs2) (r rs1) 0x3 (r rd)
+  AMOMAX_D  rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x14 a l (r rs2) (r rs1) 0x3 (r rd)
+  AMOMINU_D rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x18 a l (r rs2) (r rs1) 0x3 (r rd)
+  AMOMAXU_D rd rs1 rs2 aq -> let (a,l) = encodeAqRl aq in buildAMO 0x1C a l (r rs2) (r rs1) 0x3 (r rd)
