@@ -14,6 +14,10 @@ import GHC.Generics (Generic)
 data Extension
   = RV64I
   | RV64M
+  | RV64A
+  | RV64F
+  | RV64D
+  | RV64C
   | RVPriv
   deriving (Show, Eq, Ord, Enum, Bounded, Generic)
 
@@ -159,4 +163,9 @@ isRV64M      i = instrExtension i == RV64M
 isPrivileged i = instrExtension i == RVPriv
 
 requiresExtensions :: Instruction -> [Extension]
-requiresExtensions i = [instrExtension i]
+requiresExtensions i = case instrExtension i of
+  RV64A -> [RV64A, RV64I]
+  RV64F -> [RV64F, RV64I]
+  RV64D -> [RV64D, RV64F, RV64I]
+  RV64C -> [RV64C, RV64I]
+  e     -> [e]

@@ -1,18 +1,23 @@
 module Core.Types
   ( Register(..), FPRegister(..), CSRAddr(..)
-  , Imm12(..), Imm13(..), Imm20(..), Imm21(..), Imm6(..)
-  , UImm5(..), UImm6(..)
+  , Imm12(..), Imm13(..), Imm20(..), Imm21(..), Imm6(..), Imm9(..), Imm10(..)
+  , UImm5(..), UImm6(..), UImm7(..), UImm8(..), UImm9(..), UImm10(..)
   , AqRl(..), RoundingMode(..), FenceMode(..)
   , PrivilegeLevel(..)
-  -- Register aliases (ABI names)
+  -- Integer register aliases (ABI names)
   , x0, ra, sp, gp, tp, t0, t1, t2, fp, s1
   , a0, a1, a2, a3, a4, a5, a6, a7
   , s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
   , t3, t4, t5, t6
-  -- Register aliases (numeric names)
   , x1, x2, x3, x4, x5, x6, x7, x8, x9, x10
   , x11, x12, x13, x14, x15, x16, x17, x18, x19, x20
   , x21, x22, x23, x24, x25, x26, x27, x28, x29, x30, x31
+  -- FP register aliases
+  , ft0, ft1, ft2, ft3, ft4, ft5, ft6, ft7
+  , fs0, fs1
+  , fa0, fa1, fa2, fa3, fa4, fa5, fa6, fa7
+  , fs2, fs3, fs4, fs5, fs6, fs7, fs8, fs9, fs10, fs11
+  , ft8, ft9, ft10, ft11
   ) where
 
 import Data.Word  (Word8, Word16)
@@ -33,6 +38,14 @@ newtype Imm21  = Imm21  { unImm21  :: Int32 } deriving (Show, Eq, Ord, Generic)
 newtype Imm6   = Imm6   { unImm6   :: Int8  } deriving (Show, Eq, Ord, Generic)
 newtype UImm5  = UImm5  { unUImm5  :: Word8 } deriving (Show, Eq, Ord, Generic)
 newtype UImm6  = UImm6  { unUImm6  :: Word8 } deriving (Show, Eq, Ord, Generic)
+
+-- New types for RV64C compressed immediates
+newtype UImm7  = UImm7  { unUImm7  :: Word8  } deriving (Show, Eq, Ord, Generic)
+newtype UImm8  = UImm8  { unUImm8  :: Word8  } deriving (Show, Eq, Ord, Generic)
+newtype UImm9  = UImm9  { unUImm9  :: Word16 } deriving (Show, Eq, Ord, Generic)
+newtype UImm10 = UImm10 { unUImm10 :: Word16 } deriving (Show, Eq, Ord, Generic)
+newtype Imm9   = Imm9   { unImm9   :: Int16  } deriving (Show, Eq, Ord, Generic)
+newtype Imm10  = Imm10  { unImm10  :: Int16  } deriving (Show, Eq, Ord, Generic)
 
 data AqRl
   = AqRlNone
@@ -87,3 +100,21 @@ x22 = Register 22;  x23 = Register 23;  x24 = Register 24
 x25 = Register 25;  x26 = Register 26;  x27 = Register 27
 x28 = Register 28;  x29 = Register 29;  x30 = Register 30
 x31 = Register 31
+
+-- FP register aliases (RISC-V ABI names)
+ft0, ft1, ft2, ft3, ft4, ft5, ft6, ft7 :: FPRegister
+fs0, fs1                                :: FPRegister
+fa0, fa1, fa2, fa3, fa4, fa5, fa6, fa7 :: FPRegister
+fs2, fs3, fs4, fs5, fs6, fs7, fs8, fs9, fs10, fs11 :: FPRegister
+ft8, ft9, ft10, ft11                    :: FPRegister
+ft0  = FPRegister  0; ft1  = FPRegister  1; ft2  = FPRegister  2
+ft3  = FPRegister  3; ft4  = FPRegister  4; ft5  = FPRegister  5
+ft6  = FPRegister  6; ft7  = FPRegister  7; fs0  = FPRegister  8
+fs1  = FPRegister  9; fa0  = FPRegister 10; fa1  = FPRegister 11
+fa2  = FPRegister 12; fa3  = FPRegister 13; fa4  = FPRegister 14
+fa5  = FPRegister 15; fa6  = FPRegister 16; fa7  = FPRegister 17
+fs2  = FPRegister 18; fs3  = FPRegister 19; fs4  = FPRegister 20
+fs5  = FPRegister 21; fs6  = FPRegister 22; fs7  = FPRegister 23
+fs8  = FPRegister 24; fs9  = FPRegister 25; fs10 = FPRegister 26
+fs11 = FPRegister 27; ft8  = FPRegister 28; ft9  = FPRegister 29
+ft10 = FPRegister 30; ft11 = FPRegister 31
