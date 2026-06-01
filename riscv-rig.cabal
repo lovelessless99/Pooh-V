@@ -24,6 +24,7 @@ library
     Core.Decode
     Core.CSR
     Core.ExtDeps
+    Core.PMA
     Constraint.Types
     Constraint.Solver
     Constraint.Library
@@ -40,6 +41,11 @@ library
     CoSim.Diff
     CoSim.Spike
     CoSim.Batch
+    CoSim.Shrink
+    CoSim.Sail
+    Scenario.Types
+    Scenario.Registry
+    Scenario.Builtin.LrscInterrupt
   build-depends:
       base           >= 4.17  && < 5
     , text           >= 2.0
@@ -92,6 +98,9 @@ test-suite riscv-rig-test
     Test.ELF.FlatBinary
     Test.CoSim.Spike
     Test.Core.ExtDeps
+    Test.Core.PMA
+    Test.CoSim.Shrink
+    Test.Scenario.Registry
   build-depends:
       base           >= 4.17 && < 5
     , riscv-rig

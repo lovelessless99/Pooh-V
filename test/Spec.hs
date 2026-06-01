@@ -13,6 +13,9 @@ import qualified Test.Coverage.Bins        as CovBins
 import qualified Test.ELF.FlatBinary    as ELFTest
 import qualified Test.CoSim.Spike       as SpikeTest
 import qualified Test.Core.ExtDeps      as ExtDeps
+import qualified Test.Core.PMA          as PMA
+import qualified Test.CoSim.Shrink      as Shrink
+import qualified Test.Scenario.Registry as Registry
 
 main :: IO ()
 main = defaultMain $ testGroup "riscv-rig"
@@ -28,4 +31,7 @@ main = defaultMain $ testGroup "riscv-rig"
   , ELFTest.tests
   , SpikeTest.tests
   , ExtDeps.tests
+  , PMA.tests
+  , Shrink.tests
+  , Registry.tests
   ]
