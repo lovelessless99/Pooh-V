@@ -12,6 +12,7 @@ import qualified Test.Coverage.Accumulator as CovAccum
 import qualified Test.Coverage.Bins        as CovBins
 import qualified Test.ELF.FlatBinary    as ELFTest
 import qualified Test.CoSim.Spike       as SpikeTest
+import qualified Test.Core.ExtDeps      as ExtDeps
 
 main :: IO ()
 main = defaultMain $ testGroup "riscv-rig"
@@ -26,4 +27,5 @@ main = defaultMain $ testGroup "riscv-rig"
   , CovBins.tests
   , ELFTest.tests
   , SpikeTest.tests
+  , ExtDeps.tests
   ]

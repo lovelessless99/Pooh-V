@@ -23,6 +23,7 @@ library
     Core.Encode
     Core.Decode
     Core.CSR
+    Core.ExtDeps
     Constraint.Types
     Constraint.Solver
     Constraint.Library
@@ -90,6 +91,7 @@ test-suite riscv-rig-test
     Test.Coverage.Bins
     Test.ELF.FlatBinary
     Test.CoSim.Spike
+    Test.Core.ExtDeps
   build-depends:
       base           >= 4.17 && < 5
     , riscv-rig
