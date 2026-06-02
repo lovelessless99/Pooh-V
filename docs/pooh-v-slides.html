@@ -1,0 +1,1687 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pooh-V — SMT-Guided RISC-V Random Instruction Generator</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<style>
+:root {
+  --honey:      #fbbf24;
+  --honey-dark: #d97706;
+  --honey-glow: rgba(251,191,36,.15);
+  --bark:       #78350f;
+  --cream:      #fffbeb;
+  --forest:     #14532d;
+  --violet:     #6d28d9;
+  --blue:       #1d4ed8;
+  --red:        #dc2626;
+  --slate:      #1e293b;
+  --code-bg:    #0d1117;
+}
+
+/* ── Base ────────────────────────────────────────── */
+.reveal { font-family: 'Segoe UI', system-ui, sans-serif; }
+.reveal h1 { font-size: 1.9em; color: var(--honey); font-weight: 800; letter-spacing: -.02em; }
+.reveal h2 { font-size: 1.4em; color: var(--honey); font-weight: 700; }
+.reveal h3 { font-size: .95em; color: #fde68a; font-weight: 600; margin-bottom: .4em; }
+.reveal section { text-align: left; }
+.reveal pre  { width: 100%; box-shadow: none; margin: .4em 0; }
+.reveal pre code { font-size: .64em; line-height: 1.45; max-height: 360px; border-radius: 8px; border: 1px solid rgba(251,191,36,.2); }
+.reveal ul   { margin-left: 1.2em; }
+.reveal ul li { margin-bottom: .3em; font-size: .82em; }
+.reveal p    { font-size: .82em; }
+.reveal a    { color: var(--honey); }
+.reveal .slides section .fragment { opacity: .15; transition: opacity .3s; }
+.reveal .slides section .fragment.visible { opacity: 1; }
+
+/* ── Layout helpers ──────────────────────────────── */
+.grid2  { display: grid; grid-template-columns: 1fr 1fr;     gap: .9em; }
+.grid3  { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .7em; }
+.grid21 { display: grid; grid-template-columns: 1.4fr 1fr;   gap: .9em; }
+.center { text-align: center !important; }
+.muted  { color: #6b7280; }
+.en     { color: #94a3b8; font-style: italic; font-size: .85em; }
+
+/* ── Badges / tags ───────────────────────────────── */
+.badge { display:inline-block; padding:1px 9px; border-radius:999px; font-size:.62em; font-weight:700; margin:1px; }
+.b-honey  { background:var(--honey-dark); color:#fff; }
+.b-forest { background:var(--forest); color:#fff; }
+.b-bark   { background:var(--bark); color:var(--honey); }
+.b-blue   { background:var(--blue); color:#fff; }
+.b-violet { background:var(--violet); color:#fff; }
+.b-red    { background:var(--red); color:#fff; }
+.b-slate  { background:var(--slate); color:#94a3b8; border:1px solid #334155; }
+
+.phase { display:inline-block; background:var(--bark); color:var(--honey); font-weight:800; font-size:.65em; padding:1px 7px; border-radius:4px; margin-right:5px; letter-spacing:.03em; }
+
+/* ── Card ────────────────────────────────────────── */
+.card {
+  background: linear-gradient(135deg, rgba(251,191,36,.07), rgba(120,53,15,.12));
+  border: 1px solid rgba(251,191,36,.25);
+  border-radius: 10px;
+  padding: .75em 1em;
+}
+.card-title { color:var(--honey); font-weight:700; font-size:.85em; margin-bottom:.3em; }
+.card-en    { color:#94a3b8; font-size:.68em; margin-bottom:.4em; font-style:italic; }
+.card.green { background:linear-gradient(135deg,rgba(20,83,45,.2),rgba(34,197,94,.06)); border-color:rgba(34,197,94,.3); }
+.card.blue  { background:linear-gradient(135deg,rgba(29,78,216,.2),rgba(96,165,250,.06)); border-color:rgba(96,165,250,.3); }
+.card.red   { background:linear-gradient(135deg,rgba(220,38,38,.15),rgba(252,165,165,.05)); border-color:rgba(252,165,165,.3); }
+.card.violet{ background:linear-gradient(135deg,rgba(109,40,217,.2),rgba(167,139,250,.06)); border-color:rgba(167,139,250,.3); }
+
+/* ── Haskell note ────────────────────────────────── */
+.hs-note {
+  background: linear-gradient(90deg, rgba(29,78,216,.15), transparent);
+  border-left: 3px solid var(--honey);
+  padding: .55em .9em;
+  border-radius: 0 8px 8px 0;
+  margin: .5em 0;
+}
+.hs-note .lbl { color:var(--honey); font-size:.63em; font-weight:800; text-transform:uppercase; letter-spacing:.07em; }
+.hs-note p    { margin:.15em 0 0; font-size:.78em; }
+
+/* ── Flow diagram ────────────────────────────────── */
+.flow   { display:flex; gap:.3em; align-items:center; flex-wrap:wrap; }
+.fbox   { background:rgba(120,53,15,.55); border:1px solid rgba(251,191,36,.45); border-radius:7px; padding:.28em .65em; font-size:.7em; white-space:nowrap; text-align:center; line-height:1.3; }
+.fbox small { display:block; color:#94a3b8; font-size:.82em; }
+.fbox.hi { background:rgba(29,78,216,.4); border-color:rgba(96,165,250,.5); }
+.fbox.gr { background:rgba(20,83,45,.45); border-color:rgba(34,197,94,.5); }
+.fbox.vi { background:rgba(109,40,217,.4); border-color:rgba(167,139,250,.5); }
+.arr  { color:var(--honey); font-size:1.1em; flex-shrink:0; }
+
+/* ── Table ───────────────────────────────────────── */
+table  { font-size:.72em; width:100%; border-collapse:collapse; }
+th     { background:var(--bark); color:var(--honey); padding:.4em .7em; text-align:left; }
+td     { padding:.3em .7em; border-bottom:1px solid rgba(255,255,255,.08); }
+tr:nth-child(even) td { background:rgba(255,255,255,.04); }
+
+/* ── SVG Diagram helpers ─────────────────────────── */
+.diagram { margin: .4em 0; border-radius: 8px; overflow: hidden; }
+
+/* ── Progress ring ───────────────────────────────── */
+.ring-wrap { display:inline-flex; flex-direction:column; align-items:center; gap:.15em; }
+.ring-label { font-size:.7em; color:#94a3b8; }
+.ring-val   { font-size:.95em; font-weight:700; color:var(--honey); }
+
+/* ── Callout ─────────────────────────────────────── */
+.callout { display:flex; gap:.6em; align-items:flex-start; background:rgba(251,191,36,.07); border:1px solid rgba(251,191,36,.2); border-radius:8px; padding:.55em .8em; }
+.callout-icon { font-size:1.4em; flex-shrink:0; }
+.callout-body { font-size:.78em; }
+.callout-body strong { color:var(--honey); }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══════════════════════════ TITLE ══════════════════════════ -->
+<section data-background-gradient="radial-gradient(ellipse at 60% 40%, #3b1c08 0%, #0f172a 70%)">
+  <div class="center" style="padding-top:.5em;">
+    <div style="font-size:3.5em; margin-bottom:.1em;">🐻</div>
+    <h1 style="font-size:2.4em; margin:0;">Pooh-V</h1>
+    <p style="color:#fde68a; font-size:1em; margin:.3em 0 .1em;">
+      SMT-Guided RISC-V Random Instruction Generator
+    </p>
+    <p class="muted" style="font-size:.7em; margin:.1em 0 .8em;">
+      用 Haskell 打造的 RISC-V 硬體驗證工具 ／ Hardware verification tooling for RISC-V
+    </p>
+    <div style="margin:.6em 0;">
+      <span class="badge b-honey">Haskell</span>
+      <span class="badge b-forest">RISC-V RV64GC</span>
+      <span class="badge b-bark">SMT / Z3</span>
+      <span class="badge b-blue">Property Testing</span>
+      <span class="badge b-violet">Servant REST</span>
+      <span class="badge b-blue">Vue 3</span>
+    </div>
+    <div style="margin-top:.9em; display:flex; gap:1.8em; justify-content:center; font-size:.72em; color:#94a3b8;">
+      <span>📦 4 Phases Complete</span>
+      <span>🧪 103 Tests Passing</span>
+      <span>📐 ~4,000 LoC</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ PROBLEM ══════════════════════════ -->
+<section>
+  <h2>為什麼需要 Pooh-V？ <span class="en">The Problem</span></h2>
+  <p class="muted" style="font-size:.75em;">RISC-V 的開放性讓實作百花齊放，但驗證空間是個大問題 ／ Open ISA = many implementations, each needing thorough validation</p>
+
+  <div class="grid3" style="margin:.6em 0;">
+    <div class="card red">
+      <div class="card-title">❌ 手寫測試 <span class="en" style="font-weight:400;">Manual Tests</span></div>
+      <ul>
+        <li>只測「想到的」case</li>
+        <li>Only what you think of</li>
+        <li>維護成本高 / Hard to maintain</li>
+        <li>覆蓋率難量化 / Hard to measure</li>
+      </ul>
+    </div>
+    <div class="card" style="border-color:rgba(251,191,36,.3);">
+      <div class="card-title">⚠️ 純 Random <span class="en" style="font-weight:400;">Pure Random</span></div>
+      <ul>
+        <li>廣度還行 / Good breadth</li>
+        <li>找不到深層 corner case</li>
+        <li>Misses deep corner cases</li>
+        <li>無目標性 / No guidance</li>
+      </ul>
+    </div>
+    <div class="card red">
+      <div class="card-title">❌ Formal Verify</div>
+      <ul>
+        <li>State space 爆炸</li>
+        <li>State space explosion</li>
+        <li>難應付複雜場景</li>
+        <li>Complex scenarios hard</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card green" style="margin-top:.5em;">
+    <div class="card-title" style="color:#4ade80;">✅ Pooh-V 解法：三者結合 ／ The solution: combine all three</div>
+    <div class="flow" style="margin-top:.5em; justify-content:center;">
+      <div class="fbox hi">Random Generation<br><small>廣度 / Breadth</small></div>
+      <span class="arr">＋</span>
+      <div class="fbox">Constraint Solving<br><small>深度 Corner Case</small></div>
+      <span class="arr">＋</span>
+      <div class="fbox vi">Coverage Guidance<br><small>可量化 / Measurable</small></div>
+      <span class="arr">＝</span>
+      <div class="fbox gr">Pooh-V 🐻<br><small>三者優點</small></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ ARCHITECTURE ══════════════════════════ -->
+<section>
+  <h2>系統架構 <span class="en">System Architecture</span></h2>
+
+  <!-- Data flow diagram using SVG -->
+  <svg viewBox="0 0 900 240" style="width:100%;max-height:220px;" class="diagram">
+    <defs>
+      <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#fbbf24"/>
+      </marker>
+    </defs>
+    <!-- Row 1 -->
+    <rect x="10"  y="10" width="130" height="50" rx="8" fill="rgba(29,78,216,.35)" stroke="rgba(96,165,250,.5)" stroke-width="1.2"/>
+    <text x="75"  y="30" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="bold">使用者輸入</text>
+    <text x="75"  y="47" text-anchor="middle" fill="#64748b" font-size="9">User Input</text>
+    <line x1="140" y1="35" x2="165" y2="35" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <rect x="165" y="10" width="145" height="50" rx="8" fill="rgba(120,53,15,.5)" stroke="rgba(251,191,36,.4)" stroke-width="1.2"/>
+    <text x="238" y="30" text-anchor="middle" fill="#fde68a" font-size="11" font-weight="bold">Extension Resolver</text>
+    <text x="238" y="47" text-anchor="middle" fill="#64748b" font-size="9">依賴 DAG 解析</text>
+    <line x1="310" y1="35" x2="335" y2="35" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <rect x="335" y="10" width="160" height="50" rx="8" fill="rgba(109,40,217,.35)" stroke="rgba(167,139,250,.5)" stroke-width="1.2"/>
+    <text x="415" y="30" text-anchor="middle" fill="#c4b5fd" font-size="11" font-weight="bold">Constraint Compiler</text>
+    <text x="415" y="47" text-anchor="middle" fill="#64748b" font-size="9">SBV → Z3 SMT Query</text>
+    <line x1="495" y1="35" x2="520" y2="35" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <rect x="520" y="10" width="140" height="50" rx="8" fill="rgba(120,53,15,.5)" stroke="rgba(251,191,36,.4)" stroke-width="1.2"/>
+    <text x="590" y="30" text-anchor="middle" fill="#fde68a" font-size="11" font-weight="bold">Generator</text>
+    <text x="590" y="47" text-anchor="middle" fill="#64748b" font-size="9">Solver + Random</text>
+    <line x1="660" y1="35" x2="685" y2="35" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <rect x="685" y="10" width="200" height="50" rx="8" fill="rgba(120,53,15,.5)" stroke="rgba(251,191,36,.4)" stroke-width="1.2"/>
+    <text x="785" y="30" text-anchor="middle" fill="#fde68a" font-size="11" font-weight="bold">Instruction Sequence</text>
+    <text x="785" y="47" text-anchor="middle" fill="#64748b" font-size="9">+ ELF 包裝 / binary wrap</text>
+
+    <!-- Arrow down -->
+    <line x1="785" y1="60" x2="785" y2="85" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <!-- Row 2 -->
+    <rect x="640" y="85" width="290" height="55" rx="8" fill="rgba(220,38,38,.25)" stroke="rgba(252,165,165,.4)" stroke-width="1.2"/>
+    <text x="785" y="107" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="bold">CoSim Engine 🔬</text>
+    <text x="785" y="124" text-anchor="middle" fill="#64748b" font-size="9">Spike ＋ Sail ＋ Diff Engine</text>
+    <line x1="640" y1="112" x2="610" y2="112" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <!-- Pass / Fail branches -->
+    <rect x="455" y="85" width="150" height="55" rx="8" fill="rgba(20,83,45,.3)" stroke="rgba(34,197,94,.4)" stroke-width="1.2"/>
+    <text x="530" y="107" text-anchor="middle" fill="#86efac" font-size="11" font-weight="bold">Coverage ✅ PASS</text>
+    <text x="530" y="124" text-anchor="middle" fill="#64748b" font-size="9">STM Accumulator</text>
+    <line x1="530" y1="140" x2="530" y2="165" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <rect x="270" y="85" width="180" height="55" rx="8" fill="rgba(220,38,38,.2)" stroke="rgba(252,165,165,.35)" stroke-width="1.2"/>
+    <text x="360" y="107" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="bold">Shrinking ❌ FAIL</text>
+    <text x="360" y="124" text-anchor="middle" fill="#64748b" font-size="9">Minimal Reproducer</text>
+    <line x1="455" y1="112" x2="450" y2="112" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <!-- Row 3 -->
+    <rect x="395" y="165" width="275" height="55" rx="8" fill="rgba(109,40,217,.3)" stroke="rgba(167,139,250,.4)" stroke-width="1.2"/>
+    <text x="533" y="187" text-anchor="middle" fill="#c4b5fd" font-size="11" font-weight="bold">Coverage Optimizer 🎯</text>
+    <text x="533" y="204" text-anchor="middle" fill="#64748b" font-size="9">Thompson Sampling Bandit</text>
+
+    <!-- Feedback arrow back to generator -->
+    <path d="M 395 192 Q 200 230 200 192 Q 200 150 520 35" stroke="rgba(251,191,36,.35)" stroke-width="1.5" fill="none" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+    <text x="140" y="220" fill="rgba(251,191,36,.6)" font-size="9">Coverage Feedback Loop</text>
+  </svg>
+
+  <div class="grid3" style="margin-top:.4em; font-size:.75em;">
+    <div class="card">
+      <div class="card-title">🧱 Pure Core</div>
+      <p class="muted" style="font-size:.9em;"><code>Core.*</code> · <code>Constraint.*</code> · <code>Generator.*</code> · <code>Coverage.*</code></p>
+    </div>
+    <div class="card">
+      <div class="card-title">⚡ IO Edge</div>
+      <p class="muted" style="font-size:.9em;"><code>CoSim.*</code> · <code>ELF.*</code> · <code>Scenario.*</code></p>
+    </div>
+    <div class="card">
+      <div class="card-title">🌐 API / UI</div>
+      <p class="muted" style="font-size:.9em;"><code>API.*</code> Servant REST · Vue 3 Dashboard</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ WHY HASKELL ══════════════════════════ -->
+<section>
+  <h2>為什麼選 Haskell？ <span class="en">Why Haskell?</span></h2>
+
+  <div class="grid3">
+    <div class="card">
+      <div class="card-title">🏗️ ADT = ISA Spec</div>
+      <p>用 sum type 直接表達指令集。漏掉指令 → compile time 警告，不是 runtime bug。</p>
+      <p class="en">Sum types map perfectly to ISA. Missing case = compile error.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🧪 純函數核心</div>
+      <p>Generator、constraint compiler、coverage accumulator 全是純函數，易測試，結果可重現。</p>
+      <p class="en">Pure core = easy to test, fully reproducible results.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🔀 STM 無鎖並發</div>
+      <p>多核 coverage accumulation 用 <code>TVar + atomically</code>，不需要 mutex，不可能死鎖。</p>
+      <p class="en">Composable transactions, deadlock-free by construction.</p>
+    </div>
+    <div class="card violet">
+      <div class="card-title">🧮 SBV — SMT Binding</div>
+      <p>直接在 Haskell 寫 Z3 query。Symbolic bitvector 型別安全。</p>
+      <p class="en">Type-safe symbolic bitvectors, Z3 under the hood.</p>
+    </div>
+    <div class="card blue">
+      <div class="card-title">🎯 Hedgehog Shrinking</div>
+      <p>Property-based testing 內建 integrated shrinking。找到 bug 自動縮小序列。</p>
+      <p class="en">Auto-shrinks failing cases to minimal reproducers.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🔗 Servant API</div>
+      <p>API 型別定義 ＝ 文件 ＝ 實作。handler 型別不對，不讓你 compile。</p>
+      <p class="en">Type-level API spec. Mismatched handler = compile error.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ PHASE 1A: CORE ISA ══════════════════════════ -->
+<section>
+  <section>
+    <h2><span class="phase">Phase 1</span>核心 ISA 模型 <span class="en">Core ISA Model</span></h2>
+    <p class="muted" style="font-size:.75em;">用型別系統當 RISC-V spec 的第一道防線 ／ The type system is your first line of defense against spec bugs</p>
+
+    <div class="grid2">
+      <div>
+        <h3>🏷️ Newtype 型別安全 <span class="en">Type Safety via Newtype</span></h3>
+        <pre><code class="language-haskell">-- type alias ❌: GHC 看不出差別
+type Register   = Word8
+type FPRegister = Word8  -- 傳錯了 runtime 才知道
+
+-- newtype ✅: compile time 阻止混用
+newtype Register   = Register   { unReg  :: Word8 }
+newtype FPRegister = FPRegister { unFReg :: Word8 }
+newtype CSRAddr    = CSRAddr    { unCSR  :: Word16 }
+
+-- 不同寬度的 immediate 也不互換
+newtype Imm12 = Imm12 { unImm12 :: Int16 }
+newtype Imm21 = Imm21 { unImm21 :: Int32 }  -- JAL only</code></pre>
+      </div>
+      <div>
+        <h3>📋 Instruction Sum Type</h3>
+        <pre><code class="language-haskell">data Instruction
+  -- ── RV64I 基礎 ──────────────────
+  = ADD    Register Register Register  -- rd = rs1 + rs2
+  | ADDI   Register Register Imm12     -- rd = rs1 + sext(imm)
+  | LUI    Register Imm20              -- rd = imm << 12
+  | BEQ    Register Register Imm13     -- branch if equal
+  | JAL    Register Imm21              -- jump and link
+  | CSRRW  Register CSRAddr Register   -- CSR read/write
+  -- ── RV64M 乘除法 ────────────────
+  | MUL    Register Register Register
+  | DIV    Register Register Register
+  -- ── Privileged ──────────────────
+  | MRET                               -- return from M-mode
+  | SFENCE_VMA Register Register       -- TLB flush
+  deriving (Show, Eq, Ord, Generic)
+-- GHC -Wincomplete-patterns 保護你</code></pre>
+      </div>
+    </div>
+
+    <div class="hs-note">
+      <div class="lbl">設計精隨 ／ Key Insight</div>
+      <p>加入新指令 = 在 ADT 加 constructor。GHC 的 exhaustive pattern match 警告立刻告訴你哪些函數（encode、classify、coverage）需要更新。<em>The compiler is your spec checker.</em></p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="phase">Phase 1</span>Encode / Decode 雙向轉換</h2>
+
+    <div class="grid2">
+      <div>
+        <h3>encode :: Instruction → Word32</h3>
+        <pre><code class="language-haskell">encode :: Instruction -> Word32
+encode = \case
+  -- R-type: [funct7|rs2|rs1|f3|rd|op]
+  ADD  rd rs1 rs2 -> buildR 0x33 (r rd) 0x0 (r rs1) (r rs2) 0x00
+  SUB  rd rs1 rs2 -> buildR 0x33 (r rd) 0x0 (r rs1) (r rs2) 0x20
+  MUL  rd rs1 rs2 -> buildR 0x33 (r rd) 0x0 (r rs1) (r rs2) 0x01
+  -- I-type: [imm12|rs1|f3|rd|op]
+  ADDI rd rs1 imm -> buildI 0x13 (r rd) 0x0 (r rs1) (i12 imm)
+  -- B-type: [imm13 encoded|rs2|rs1|f3|op]
+  BEQ  rs1 rs2 imm -> buildB 0x63 0x0 (r rs1) (r rs2) (i13 imm)
+  -- J-type
+  JAL  rd imm -> buildJ 0x6F (r rd) (i21 imm)
+  MRET        -> buildR 0x73 0 0 0 2 0x18  -- spec §3.3.2</code></pre>
+      </div>
+      <div>
+        <h3>decode :: Word32 → Either DecodeError Instruction</h3>
+        <pre><code class="language-haskell">decode :: Word32 -> Either DecodeError Instruction
+decode w = case opcode w of
+  0x33 -> decodeR33 w
+  0x13 -> decodeI13 w
+  0x63 -> decodeBranch w
+  0x73 -> decodeSystem w
+  op   -> Left (UnknownOpcode op)
+
+data DecodeError
+  = UnknownOpcode    Word32
+  | UnknownFunct3    Word32 Word32
+  | ReservedEncoding Word32
+-- Either 強制 caller 處理錯誤
+-- Forced error handling, no surprises</code></pre>
+        <div class="hs-note" style="margin-top:.4em;">
+          <div class="lbl">為什麼 Either？</div>
+          <p>RISC-V 保留 encoding 是預期的錯誤，不是 exception。<em>Expected failures belong in the type.</em></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:.5em;">
+      <div class="callout-icon">✅</div>
+      <div class="callout-body">
+        <strong>Roundtrip property test：</strong> <code>decode (encode instr) === Right instr</code>
+        — Hedgehog 自動生成 100 個隨機指令，一行程式碼取代數十個 unit test。
+        <span class="en">One property replaces dozens of unit tests.</span>
+      </div>
+    </div>
+  </section>
+</section>
+
+<!-- ══════════════════════════ CONSTRAINT ══════════════════════════ -->
+<section>
+  <section>
+    <h2><span class="phase">Phase 1</span>Constraint System — Z3 SMT</h2>
+    <p class="muted" style="font-size:.75em;">用 eDSL 描述「我想生成什麼樣的指令」，Z3 自動找到滿足條件的具體值<br>
+    <em>Describe what you want; Z3 finds values that satisfy all constraints.</em></p>
+
+    <div class="grid2">
+      <div>
+        <h3>ConstraintDef 資料結構</h3>
+        <pre><code class="language-haskell">data ConstraintDef = ConstraintDef
+  { cname      :: Text            -- human-readable name
+  , ctags      :: [Tag]           -- [Memory, Atomic, ...]
+  , cpredicate :: SymInstrParams  -- symbolic predicate
+                 -> SBool         -- Z3 assertion
+  }
+
+-- Symbolic 參數（not concrete values！）
+data SymInstrParams = SymInstrParams
+  { symRd     :: SWord8   -- symbolic 5-bit register
+  , symRs1    :: SWord8
+  , symImm    :: SInt32   -- symbolic immediate
+  , symFunct3 :: SWord8 ... }</code></pre>
+
+        <h3 style="margin-top:.7em;">常用 Constraint 範例</h3>
+        <pre><code class="language-haskell">rdNotZero :: ConstraintDef
+rdNotZero = ConstraintDef "rd≠0" [Register]
+  (\s -> symRd s ./= 0)          -- SBV symbolic ≠
+
+alignedAddr8 :: ConstraintDef
+alignedAddr8 = ConstraintDef "8B-align" [Memory]
+  (\s -> (symRs1 s + sext (symImm s)) `sMod` 8 .== 0)</code></pre>
+      </div>
+      <div>
+        <h3>Combinator eDSL</h3>
+        <pre><code class="language-haskell">-- 像 Boolean 一樣組合
+c1 .&&. c2    -- AND
+c1 .||. c2    -- OR
+cnot c1       -- NOT
+implies c1 c2 -- implication
+
+-- 條件性 constraint
+whenExtension :: Extension
+             -> ConstraintDef -> ConstraintDef
+
+-- 組合成 set
+myConstraints :: ConstraintSet
+myConstraints = mempty
+  & addConstraint rdNotZero
+  & addConstraint alignedAddr8
+  & addConstraint (whenExtension RV64A lrscPaired)</code></pre>
+
+        <h3 style="margin-top:.7em;">Z3 求解</h3>
+        <pre><code class="language-haskell">solve :: ConstraintSet -> IO (Maybe InstrParams)
+-- Nothing  = UNSAT（constraint 矛盾）
+-- Just p   = 一個合法的 assignment
+--   p.ipRd, p.ipRs1, p.ipImm ...
+
+-- 自動 UNSAT 偵測
+checkFeasibility :: ConstraintSet
+                 -> IO FeasibilityResult</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="phase">Phase 1</span>Over-constraint 偵測與密度估計</h2>
+    <p class="muted" style="font-size:.75em;">系統主動告訴你 constraint 是否太緊 ／ Proactive feedback when constraints become too tight</p>
+
+    <div class="grid2">
+      <div>
+        <div class="card red" style="margin-bottom:.5em;">
+          <div class="card-title">UNSAT 偵測 <span class="en">Infeasibility Detection</span></div>
+          <pre><code class="language-haskell">-- rd 必須是 0，且不能是 0 → UNSAT
+let c1 = mkC (\s -> symRd s .== 0)
+    c2 = mkC (\s -> symRd s ./= 0)
+    cs = addConstraint c1 (addConstraint c2 mempty)
+
+result <- solve cs
+-- result = Nothing ✅（偵測到矛盾）</code></pre>
+        </div>
+
+        <div class="card">
+          <div class="card-title">解空間密度估計 <span class="en">Solution Density</span></div>
+          <pre><code class="language-haskell">data DensityAssessment
+  = HealthyDensity   -- ratio > 0.5  ✅
+  | TightConstraints -- 0.1 ~ 0.5   ⚠️
+  | OverConstrained  -- < 0.1       ❌
+  | PossiblyExhausted</code></pre>
+        </div>
+      </div>
+      <div>
+        <!-- Visual density meter -->
+        <div style="text-align:center; padding:1em 0;">
+          <svg viewBox="0 0 300 180" style="width:100%;max-height:180px;">
+            <text x="150" y="20" text-anchor="middle" fill="#fde68a" font-size="13" font-weight="bold">解空間密度 / Solution Density</text>
+            <!-- Bars -->
+            <rect x="30"  y="130" width="50" height="30" rx="4" fill="rgba(34,197,94,.7)"/>
+            <rect x="30"  y="60"  width="50" height="70" rx="4" fill="rgba(34,197,94,.3)"/>
+            <text x="55"  y="150" text-anchor="middle" fill="#86efac" font-size="10">Healthy</text>
+            <text x="55"  y="52"  text-anchor="middle" fill="#86efac" font-size="10">0.8</text>
+
+            <rect x="125" y="130" width="50" height="30" rx="4" fill="rgba(251,191,36,.7)"/>
+            <rect x="125" y="95"  width="50" height="35" rx="4" fill="rgba(251,191,36,.3)"/>
+            <text x="150" y="150" text-anchor="middle" fill="#fde68a" font-size="10">Tight</text>
+            <text x="150" y="87"  text-anchor="middle" fill="#fde68a" font-size="10">0.3</text>
+
+            <rect x="220" y="130" width="50" height="30" rx="4" fill="rgba(220,38,38,.7)"/>
+            <rect x="220" y="118" width="50" height="12" rx="4" fill="rgba(220,38,38,.3)"/>
+            <text x="245" y="150" text-anchor="middle" fill="#fca5a5" font-size="10">Over</text>
+            <text x="245" y="110" text-anchor="middle" fill="#fca5a5" font-size="10">0.05</text>
+
+            <!-- Axis -->
+            <line x1="20" y1="160" x2="280" y2="160" stroke="#334155" stroke-width="1"/>
+            <line x1="20" y1="45"  x2="20"  y2="160" stroke="#334155" stroke-width="1"/>
+            <text x="10" y="50"  fill="#64748b" font-size="9" text-anchor="middle">1.0</text>
+            <text x="10" y="105" fill="#64748b" font-size="9" text-anchor="middle">0.5</text>
+            <text x="10" y="160" fill="#64748b" font-size="9" text-anchor="middle">0.0</text>
+          </svg>
+        </div>
+        <div class="hs-note">
+          <div class="lbl">自動放寬建議 ／ Auto-relaxation</div>
+          <p>當 density 太低，系統分析每個 constraint 對 density 的貢獻，提出人類可讀的放寬建議，不需要懂 SMT。<em>No SMT expertise needed.</em></p>
+        </div>
+      </div>
+    </div>
+  </section>
+</section>
+
+<!-- ══════════════════════════ GENERATOR ══════════════════════════ -->
+<section>
+  <h2><span class="phase">Phase 1</span>Generator — 兩條路徑 <span class="en">Two-Path Generator</span></h2>
+
+  <div class="grid2" style="margin-bottom:.5em;">
+    <div class="card violet">
+      <div class="card-title">🎯 Solver-Directed（深度 / Depth）</div>
+      <p>呼叫 Z3 的 optimize mode，在 constraint 解空間的<strong>邊界</strong>尋找 assignment。專門挖 corner case。</p>
+      <p class="en">Z3 maximize/minimize each field → boundary solutions = corner cases.</p>
+      <pre><code class="language-haskell">-- 找邊界點：maximize & minimize 每個 variable
+findBoundaryPoints :: SMTQuery -> Int
+                   -> IO [PartialAssignment]</code></pre>
+    </div>
+    <div class="card blue">
+      <div class="card-title">🌊 Random Path（廣度 / Breadth）</div>
+      <p>Hedgehog biased random。在 solver 確認的合法空間內廣度探索，corner value 加權。</p>
+      <p class="en">Hedgehog Gen with corner-case weighted sampling.</p>
+      <pre><code class="language-haskell">genCornerCaseImm12 :: Gen Imm12
+genCornerCaseImm12 = Gen.frequency
+  [ (3, pure (Imm12 0))        -- zero
+  , (3, pure (Imm12 2047))     -- max+
+  , (3, pure (Imm12 (-2048)))  -- max-
+  , (5, genRandom)             -- other
+  ]</code></pre>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-icon">🌱</div>
+    <div class="callout-body">
+      <strong>Seed &amp; Reproducibility：</strong> 每次 run 都綁定 seed，<code>runWithSeed :: Seed → GeneratorConfig → IO RunResult</code>。
+      發現 bug？記錄 seed，下次必定重現。<em>Bugs are always reproducible with the seed.</em>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ COVERAGE ══════════════════════════ -->
+<section>
+  <section>
+    <h2><span class="phase">Phase 1</span>Coverage Model — 多維地圖 <span class="en">Multi-Dimensional Coverage Map</span></h2>
+    <p class="muted" style="font-size:.75em;">Coverage 不是一個數字，是一張可導航的地圖 ／ Coverage is a navigable map, not a single percentage</p>
+
+    <svg viewBox="0 0 880 200" style="width:100%;max-height:200px;" class="diagram">
+      <defs>
+        <linearGradient id="gOpcode" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#92400e"/>
+        </linearGradient>
+      </defs>
+      <!-- Dimension cards -->
+      <g transform="translate(10,10)">
+        <!-- Opcode -->
+        <rect width="115" height="80" rx="7" fill="rgba(251,191,36,.12)" stroke="rgba(251,191,36,.4)" stroke-width="1.2"/>
+        <text x="57" y="22" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="bold">Opcode</text>
+        <text x="57" y="38" text-anchor="middle" fill="#94a3b8" font-size="9">每個指令跑過？</text>
+        <text x="57" y="52" text-anchor="middle" fill="#94a3b8" font-size="9">Has each instr run?</text>
+        <text x="57" y="70" text-anchor="middle" fill="#fde68a" font-size="12" font-weight="bold">~150 bins</text>
+      </g>
+      <g transform="translate(135,10)">
+        <rect width="115" height="80" rx="7" fill="rgba(96,165,250,.1)" stroke="rgba(96,165,250,.4)" stroke-width="1.2"/>
+        <text x="57" y="22" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="bold">Value Range</text>
+        <text x="57" y="38" text-anchor="middle" fill="#94a3b8" font-size="9">極端值測到了嗎？</text>
+        <text x="57" y="52" text-anchor="middle" fill="#94a3b8" font-size="9">0, max, -1, etc.?</text>
+        <text x="57" y="70" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="bold">8× per operand</text>
+      </g>
+      <g transform="translate(260,10)">
+        <rect width="115" height="80" rx="7" fill="rgba(167,139,250,.1)" stroke="rgba(167,139,250,.4)" stroke-width="1.2"/>
+        <text x="57" y="22" text-anchor="middle" fill="#c4b5fd" font-size="11" font-weight="bold">Seq Pattern</text>
+        <text x="57" y="38" text-anchor="middle" fill="#94a3b8" font-size="9">LR/SC pair? Load-use?</text>
+        <text x="57" y="52" text-anchor="middle" fill="#94a3b8" font-size="9">Sequence patterns</text>
+        <text x="57" y="70" text-anchor="middle" fill="#c4b5fd" font-size="12" font-weight="bold">~50 patterns</text>
+      </g>
+      <g transform="translate(385,10)">
+        <rect width="115" height="80" rx="7" fill="rgba(52,211,153,.1)" stroke="rgba(52,211,153,.4)" stroke-width="1.2"/>
+        <text x="57" y="22" text-anchor="middle" fill="#6ee7b7" font-size="11" font-weight="bold">Extension ×</text>
+        <text x="57" y="38" text-anchor="middle" fill="#94a3b8" font-size="9">A+F+D 同時測？</text>
+        <text x="57" y="52" text-anchor="middle" fill="#94a3b8" font-size="9">Cross-extension</text>
+        <text x="57" y="70" text-anchor="middle" fill="#6ee7b7" font-size="12" font-weight="bold">N × Opcode</text>
+      </g>
+      <g transform="translate(510,10)">
+        <rect width="115" height="80" rx="7" fill="rgba(251,113,133,.1)" stroke="rgba(251,113,133,.4)" stroke-width="1.2"/>
+        <text x="57" y="22" text-anchor="middle" fill="#fda4af" font-size="11" font-weight="bold">Privilege</text>
+        <text x="57" y="38" text-anchor="middle" fill="#94a3b8" font-size="9">M/S/U mode 各測？</text>
+        <text x="57" y="52" text-anchor="middle" fill="#94a3b8" font-size="9">Each privilege level</text>
+        <text x="57" y="70" text-anchor="middle" fill="#fda4af" font-size="12" font-weight="bold">3 × Opcode</text>
+      </g>
+      <g transform="translate(635,10)">
+        <rect width="115" height="80" rx="7" fill="rgba(253,186,116,.1)" stroke="rgba(253,186,116,.4)" stroke-width="1.2"/>
+        <text x="57" y="22" text-anchor="middle" fill="#fdba74" font-size="11" font-weight="bold">Memory Type</text>
+        <text x="57" y="38" text-anchor="middle" fill="#94a3b8" font-size="9">Cache/Uncache/IO</text>
+        <text x="57" y="52" text-anchor="middle" fill="#94a3b8" font-size="9">PMA attributes</text>
+        <text x="57" y="70" text-anchor="middle" fill="#fdba74" font-size="12" font-weight="bold">3 × Opcode</text>
+      </g>
+      <g transform="translate(760,10)">
+        <rect width="110" height="80" rx="7" fill="rgba(209,213,219,.06)" stroke="rgba(209,213,219,.3)" stroke-width="1.2" stroke-dasharray="4 3"/>
+        <text x="55" y="22" text-anchor="middle" fill="#9ca3af" font-size="11" font-weight="bold">Multi-core</text>
+        <text x="55" y="38" text-anchor="middle" fill="#64748b" font-size="9">Race conditions</text>
+        <text x="55" y="52" text-anchor="middle" fill="#64748b" font-size="9">RVWMO litmus</text>
+        <text x="55" y="70" text-anchor="middle" fill="#9ca3af" font-size="11">Phase 5 📋</text>
+      </g>
+
+      <!-- Labels below -->
+      <text x="440" y="115" text-anchor="middle" fill="#475569" font-size="10">每個 dimension 獨立追蹤 ／ Each dimension tracked independently</text>
+      <text x="440" y="130" text-anchor="middle" fill="#475569" font-size="10">CoverageBin = sum type，窮舉所有可能 ／ Sum type, exhaustively enumerable</text>
+    </svg>
+  </section>
+
+  <section>
+    <h2><span class="phase">Phase 1</span>STM Coverage Accumulator</h2>
+    <p class="muted" style="font-size:.75em;">Software Transactional Memory — concurrent, composable, deadlock-free</p>
+
+    <div class="grid2">
+      <div>
+        <h3>Thread-safe 設計 <span class="en">Thread-safe Design</span></h3>
+        <pre><code class="language-haskell">-- TVar = STM 的可變變數
+data CoverageAccumulator = CoverageAccumulator
+  { caMap   :: TVar CoverageMap  -- atomic map
+  , caTotal :: TVar Word64       -- hit counter
+  }
+
+-- atomically = all-or-nothing
+-- 多個 worker thread 同時更新，不需 mutex
+recordCoverage
+  :: CoverageAccumulator
+  -> [CoverageBin]
+  -> STM ()
+recordCoverage acc bins =
+  modifyTVar (caMap acc) (applyHits bins)</code></pre>
+      </div>
+      <div>
+        <h3>實際用法 <span class="en">In Practice</span></h3>
+        <pre><code class="language-haskell">acc <- newAccumulator
+
+mapM_ (\round -> do
+  seqs <- mapM (\_ -> generateSequence cfg) [1..10]
+  let bins = concatMap classifySequence seqs
+  -- thread-safe: 多個 round 可以 parallel
+  atomically $ recordCoverage acc bins
+  -- snapshot 任何時候都可以讀
+  snap <- snapshotCoverage acc
+  putStr (renderSummary snap)
+  ) [1..roRounds opts]</code></pre>
+
+        <div class="hs-note" style="margin-top:.4em;">
+          <div class="lbl">STM vs Mutex</div>
+          <p>STM transaction 可以組合：<code>atomically (a &gt;&gt; b)</code> 保證 a+b 一起成功或回滾。Mutex 做不到。<em>Composable atomicity is a superpower.</em></p>
+        </div>
+      </div>
+    </div>
+  </section>
+</section>
+
+<!-- ══════════════════════════ COSIM ══════════════════════════ -->
+<section>
+  <h2><span class="phase">Phase 1</span>CoSim Engine <span class="en">Co-Simulation</span></h2>
+  <p class="muted" style="font-size:.75em;">同一個序列跑在多個 RISC-V 實作，比對每一步的 architectural state<br>
+  <em>Same test sequence, multiple simulators, step-by-step state comparison</em></p>
+
+  <div class="grid21">
+    <div>
+      <h3>Oracle 能力宣告矩陣 <span class="en">Oracle Capability Matrix</span></h3>
+      <table>
+        <tr><th>Oracle</th><th>Interrupt<br>Timing</th><th>FP<br>Exact</th><th>RVWMO</th><th>PMA</th></tr>
+        <tr><td><strong>Spike</strong> ⭐</td><td>✅</td><td>✅</td><td>❌</td><td>✅</td></tr>
+        <tr><td><strong>Sail</strong> ⭐</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+        <tr><td>QEMU ⚠️</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td></tr>
+        <tr><td>SoftFloat</td><td>—</td><td>✅</td><td>—</td><td>—</td></tr>
+      </table>
+      <p style="font-size:.7em; color:#6b7280; margin-top:.3em;">系統根據 sequence 特性自動過濾 oracle ／ Auto-filtered based on sequence properties</p>
+
+      <div class="callout" style="margin-top:.4em;">
+        <div class="callout-icon">💡</div>
+        <div class="callout-body">
+          <strong>QEMU 為何幾乎都 ❌：</strong> 用 host FPU（非軟體模擬）、以 translation block 為單位執行（interrupt timing 不準）、host memory model 遮蔽 RVWMO 差異。
+          <span class="en">Host FPU, block-level interrupt, TSO masks RVWMO.</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3>Mismatch Report</h3>
+      <pre><code class="language-haskell">data MismatchReport = MismatchReport
+  { mrSeed    :: Seed        -- 可重現
+  , mrPC      :: Word64      -- 哪裡不同
+  , mrInstr   :: Instruction -- 哪條指令
+  , mrDiffs   :: [StateDiff] -- 具體差異
+  , mrContext :: [LogEntry]  -- 前 10 條
+  }
+
+data StateDiff
+  = GPRDiff Register Word64 Word64
+  --         reg      spike   sail
+  | FPRDiff FPRegister Double Double
+  | CSRDiff CSRAddr Word64 Word64
+  | MemDiff Word64 Word8 Word8</code></pre>
+      <div class="hs-note" style="margin-top:.4em;">
+        <div class="lbl">Shrinking</div>
+        <p>Hedgehog integrated shrinking 自動縮小失敗序列到最小可重現序列，不需要另外寫 shrink 函數。<em>Free shrinking via Hedgehog.</em></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ PHASE 2 ══════════════════════════ -->
+<section>
+  <h2><span class="phase">Phase 2</span>完整 ISA + Scenario 系統 <span class="en">Full ISA + Scenario DSL</span></h2>
+
+  <div class="grid2">
+    <div>
+      <h3>新增 Extensions</h3>
+      <div style="display:flex; flex-wrap:wrap; gap:.3em; margin:.4em 0;">
+        <span class="badge b-honey">RV64A — LR/SC/AMO</span>
+        <span class="badge b-honey">RV64F — Single FP</span>
+        <span class="badge b-honey">RV64D — Double FP</span>
+        <span class="badge b-honey">RV64C — Compressed 16-bit</span>
+        <span class="badge b-forest">Extension DAG 相依性</span>
+      </div>
+      <pre><code class="language-haskell">-- 自動補齊依賴（D requires F requires Zicsr）
+extensionDeps :: Extension -> [Extension]
+extensionDeps RV64D = [RV64F]
+extensionDeps RV64F = [Zicsr]
+extensionDeps _     = []
+
+resolveExtensions :: Set Extension -> Set Extension</code></pre>
+
+      <h3 style="margin-top:.6em;">Scenario = 測試故事</h3>
+      <p class="en" style="margin:0 0 .3em;">Scenarios describe <em>intent</em>, not instructions. Phases + Events create the narrative.</p>
+    </div>
+    <div>
+      <h3>LR/SC + Interrupt Scenario</h3>
+      <pre><code class="language-haskell">lrscInterruptScenario :: Scenario
+lrscInterruptScenario = do
+  phase "setup" $ do
+    emit (SetPrivilege Machine)
+    emit (SetMstatus mIE_enabled)  -- 開 interrupt
+  phase "lr-acquire" $ do
+    useConstraint lrscAqRlComplete
+    emit (Instruction LR_D)        -- 強制 LR.D
+    randomN 0 3                    -- 0~3 隨機指令
+  phase "inject" $ do
+    emit InjectTimerInterrupt      -- 注入 timer interrupt
+  phase "trap-handler" $ do
+    randomN 5 20                   -- handler 隨機指令
+    emit (Instruction MRET)        -- 返回
+  phase "sc-verify" $ do
+    emit (Instruction SC_D)
+    -- reservation 被 interrupt 破壞
+    -- SC.D 必須 fail（rd = 1）✅</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ PHASE 3 ══════════════════════════ -->
+<section>
+  <section>
+    <h2><span class="phase">Phase 3</span>Thompson Sampling Bandit <span class="en">Coverage-Guided Generation</span></h2>
+    <p class="muted" style="font-size:.75em;">智慧地決定「下一輪生成什麼」，不浪費資源在已覆蓋的地方<br><em>Intelligently allocate generation budget to uncovered areas.</em></p>
+
+    <div class="grid2">
+      <div>
+        <h3>Coverage Frontier</h3>
+        <pre><code class="language-haskell">-- Frontier = 已 hit 但鄰居未 hit 的 bin
+-- 這些 bin 的鄰居是最容易覆蓋的下一目標
+computeFrontier :: CoverageMap -> Set CoverageBin
+
+neighbors :: CoverageBin -> [CoverageBin]
+neighbors (ValueBin op Zero) =
+  [ValueBin op One, ValueBin op SmallPos]
+neighbors (OpcodeBin op) =
+  map OpcodeBin (relatedOpcodes op)</code></pre>
+
+        <h3 style="margin-top:.6em;">Thompson Sampling</h3>
+        <pre><code class="language-haskell">data BanditArm = BanditArm
+  { armAlpha :: Double  -- successes + 1
+  , armBeta  :: Double  -- failures + 1
+  }
+-- 從 Beta(α, β) sample，選 sample 最大的 arm
+-- 自動 exploration vs exploitation 平衡</code></pre>
+      </div>
+      <div>
+        <!-- Thompson Sampling visualization -->
+        <svg viewBox="0 0 320 220" style="width:100%;max-height:220px;">
+          <text x="160" y="18" text-anchor="middle" fill="#fbbf24" font-size="12" font-weight="bold">Thompson Sampling</text>
+          <text x="160" y="32" text-anchor="middle" fill="#94a3b8" font-size="9">Beta(α, β) 分布 per coverage target</text>
+
+          <!-- Beta distribution curves (approximated with bezier) -->
+          <!-- Arm 1: well-explored (peaked, high alpha) -->
+          <path d="M 20 180 C 30 180, 50 60, 80 55 C 110 50, 130 180, 150 180" fill="rgba(34,197,94,.2)" stroke="rgba(34,197,94,.7)" stroke-width="1.5"/>
+          <text x="85" y="48" text-anchor="middle" fill="#86efac" font-size="9">已探索 arm</text>
+          <text x="85" y="196" text-anchor="middle" fill="#64748b" font-size="8">high confidence</text>
+
+          <!-- Arm 2: uncertain (flat, low samples) -->
+          <path d="M 170 180 C 180 175, 200 140, 230 135 C 260 130, 290 175, 300 180" fill="rgba(251,191,36,.15)" stroke="rgba(251,191,36,.6)" stroke-width="1.5"/>
+          <text x="235" y="128" text-anchor="middle" fill="#fde68a" font-size="9">未探索 arm</text>
+          <text x="235" y="196" text-anchor="middle" fill="#64748b" font-size="8">uncertain → explore!</text>
+
+          <line x1="10" y1="182" x2="310" y2="182" stroke="#334155" stroke-width="1"/>
+          <text x="160" y="213" text-anchor="middle" fill="#475569" font-size="9">未探索的 arm 有更大 Beta variance → 更容易被選到</text>
+        </svg>
+
+        <div class="hs-note">
+          <div class="lbl">為什麼 Thompson Sampling</div>
+          <p>比 ε-greedy 更快收斂，比 UCB1 更適合非平穩分佈（coverage 隨時間改變）。<em>Adapts to changing reward distributions naturally.</em></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="phase">Phase 3</span>Servant REST API — 型別安全 <span class="en">Type-Safe API</span></h2>
+    <p class="muted" style="font-size:.75em;">API 型別定義 ＝ 文件 ＝ 實作 ／ The type IS the documentation AND the contract</p>
+
+    <div class="grid2">
+      <div>
+        <h3>API 型別定義</h3>
+        <pre><code class="language-haskell">-- 每個 endpoint 是型別的一部分
+type RigAPI
+  =    "coverage"  :> Get  '[JSON] CoverageSnapshot
+  :<|> "bandit"    :> Get  '[JSON] BanditSnapshot
+  :<|> "run"       :> ReqBody '[JSON] RunRequest
+                   :> Post '[JSON] RunResult
+  :<|> "scenarios" :> Get  '[JSON] [ScenarioInfo]
+  :<|> "events"    :> StreamGet NewlineFraming
+                      '[JSON] ServerEvent  -- SSE</code></pre>
+
+        <h3 style="margin-top:.6em;">Handler 型別自動推導</h3>
+        <pre><code class="language-haskell">server :: Server RigAPI
+server = getCoverage :<|> getBandit
+    :<|> postRun :<|> getScenarios
+    :<|> getEvents
+-- handler 型別不對 → 不能 compile ✅</code></pre>
+      </div>
+      <div>
+        <h3>vs 傳統框架 <span class="en">vs Traditional Frameworks</span></h3>
+        <table>
+          <tr><th></th><th>Servant</th><th>Express/Flask</th></tr>
+          <tr><td>型別檢查</td><td>✅ Compile time</td><td>❌ Runtime</td></tr>
+          <tr><td>文件同步</td><td>✅ 自動</td><td>❌ 手動</td></tr>
+          <tr><td>重構安全</td><td>✅ Type-safe</td><td>❌ 人工確認</td></tr>
+          <tr><td>OpenAPI</td><td>✅ 自動生成</td><td>⚠️ 插件</td></tr>
+        </table>
+        <div class="hs-note" style="margin-top:.5em;">
+          <div class="lbl">精隨</div>
+          <p>改了 endpoint 的 response type？GHC 立刻告訴你哪個 client 需要更新。<em>The compiler enforces the API contract.</em></p>
+        </div>
+      </div>
+    </div>
+  </section>
+</section>
+
+<!-- ══════════════════════════ PHASE 4 ══════════════════════════ -->
+<section>
+  <h2><span class="phase">Phase 4</span>Vue3 Dashboard 🍯</h2>
+  <p class="muted" style="font-size:.75em;">即時 coverage 視覺化 + SSE 推送 ／ Real-time coverage visualization with Server-Sent Events</p>
+
+  <div class="grid2">
+    <div>
+      <h3>架構 <span class="en">Frontend Stack</span></h3>
+      <div style="display:flex; flex-direction:column; gap:.35em; font-size:.8em;">
+        <div class="card" style="padding:.4em .7em;">
+          <strong style="color:var(--honey);">Vue 3 + TypeScript + Vite</strong>
+          <span class="muted"> — 前端框架 / Frontend framework</span>
+        </div>
+        <div class="card" style="padding:.4em .7em;">
+          <strong style="color:var(--honey);">Pinia</strong>
+          <span class="muted"> — Coverage store, Bandit store</span>
+        </div>
+        <div class="card" style="padding:.4em .7em;">
+          <strong style="color:var(--honey);">Vue Router</strong>
+          <span class="muted"> — Hash routing（wai-app-static 相容）</span>
+        </div>
+        <div class="card" style="padding:.4em .7em;">
+          <strong style="color:var(--honey);">useSSE composable</strong>
+          <span class="muted"> — Auto-reconnect EventSource</span>
+        </div>
+      </div>
+
+      <h3 style="margin-top:.6em;">四個頁面 <span class="en">Four Views</span></h3>
+      <ul>
+        <li>🍯 Coverage — 即時 coverage 統計</li>
+        <li>🌳 Bandit — Thompson Sampling arm 狀態</li>
+        <li>⚙️ Control — 啟動/停止 fuzzing</li>
+        <li>🗺️ Scenarios — Scenario 列表與執行狀態</li>
+      </ul>
+    </div>
+    <div>
+      <h3>SSE 即時更新 <span class="en">Real-time via SSE</span></h3>
+      <pre><code class="language-typescript">// useSSE composable — 自動重連
+export function useSSE() {
+  const coverage = useCoverageStore()
+  const bandit   = useBanditStore()
+  let es: EventSource | null = null
+
+  function connect() {
+    es = new EventSource('/api/events')
+    es.addEventListener('coverage', e =>
+      coverage.update(JSON.parse(e.data))
+    )
+    es.addEventListener('bandit', e =>
+      bandit.update(JSON.parse(e.data))
+    )
+    es.onerror = () => {
+      es?.close()
+      setTimeout(connect, 2000) // 自動重連
+    }
+  }
+  onMounted(connect)
+  onUnmounted(() => es?.close())
+}</code></pre>
+      <div class="hs-note" style="margin-top:.4em;">
+        <div class="lbl">WAI Static 整合</div>
+        <p><code>/api/*</code> → Servant；其他 → wai-app-static 服務 Vue dist。<em>Single binary serves both API and frontend.</em></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ ROADMAP ══════════════════════════ -->
+<section>
+  <h2>六階段 Roadmap <span class="en">Six-Phase Roadmap</span></h2>
+
+  <!-- Visual phase timeline -->
+  <svg viewBox="0 0 880 80" style="width:100%;max-height:80px;margin-bottom:.5em;" class="diagram">
+    <defs>
+      <linearGradient id="done" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#78350f"/>
+        <stop offset="100%" stop-color="#d97706"/>
+      </linearGradient>
+    </defs>
+    <!-- Timeline bar -->
+    <rect x="20" y="35" width="840" height="8" rx="4" fill="#1e293b"/>
+    <rect x="20" y="35" width="560" height="8" rx="4" fill="url(#done)"/>
+
+    <!-- Phase nodes -->
+    <circle cx="90"  cy="39" r="14" fill="#d97706" stroke="#fbbf24" stroke-width="2"/>
+    <text x="90"  y="44" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">1</text>
+    <circle cx="230" cy="39" r="14" fill="#d97706" stroke="#fbbf24" stroke-width="2"/>
+    <text x="230" y="44" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">2</text>
+    <circle cx="370" cy="39" r="14" fill="#d97706" stroke="#fbbf24" stroke-width="2"/>
+    <text x="370" y="44" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">3</text>
+    <circle cx="510" cy="39" r="14" fill="#d97706" stroke="#fbbf24" stroke-width="2"/>
+    <text x="510" y="44" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">4</text>
+    <circle cx="650" cy="39" r="14" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+    <text x="650" y="44" text-anchor="middle" fill="#9ca3af" font-size="10" font-weight="bold">5</text>
+    <circle cx="790" cy="39" r="14" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+    <text x="790" y="44" text-anchor="middle" fill="#9ca3af" font-size="10" font-weight="bold">6</text>
+
+    <!-- Labels -->
+    <text x="90"  y="72" text-anchor="middle" fill="#fbbf24" font-size="9">Base ISA</text>
+    <text x="230" y="72" text-anchor="middle" fill="#fbbf24" font-size="9">Full ISA+Scenario</text>
+    <text x="370" y="72" text-anchor="middle" fill="#fbbf24" font-size="9">Coverage Opt.</text>
+    <text x="510" y="72" text-anchor="middle" fill="#fbbf24" font-size="9">Dashboard</text>
+    <text x="650" y="72" text-anchor="middle" fill="#64748b" font-size="9">Multi-core</text>
+    <text x="790" y="72" text-anchor="middle" fill="#64748b" font-size="9">RVV Vector</text>
+
+    <!-- Done label -->
+    <text x="280" y="20" fill="#d97706" font-size="9">Phases 1-4 complete ✅</text>
+    <text x="640" y="20" fill="#475569" font-size="9">Planned 📋</text>
+  </svg>
+
+  <table>
+    <tr><th>Phase</th><th>功能 ／ Features</th><th>Haskell 亮點 ／ Highlights</th><th>狀態</th></tr>
+    <tr>
+      <td><span class="phase">1</span>Base</td>
+      <td>RV64I+M ADT · Encode/Decode · Z3 Constraint · Random Gen · Coverage STM · Spike CoSim · ELF</td>
+      <td>Sum types · Newtype · Either · STM · SBV · Hedgehog</td>
+      <td style="color:#86efac;">✅ Done</td>
+    </tr>
+    <tr>
+      <td><span class="phase">2</span>ISA+</td>
+      <td>RV64A/F/D/C · Extension DAG · Scenario DSL · LR/SC interrupt · Shrinking</td>
+      <td>State monad · Event system · Integrated shrinking</td>
+      <td style="color:#86efac;">✅ Done</td>
+    </tr>
+    <tr>
+      <td><span class="phase">3</span>Cov.</td>
+      <td>Thompson Sampling Bandit · Coverage Frontier · Plateau detection · Servant REST API</td>
+      <td>Servant type API · SSE streaming · Beta distribution</td>
+      <td style="color:#86efac;">✅ Done</td>
+    </tr>
+    <tr>
+      <td><span class="phase">4</span>UI</td>
+      <td>Vue3 + Pinia Dashboard · SSE 即時更新 · wai-app-static · Hash routing</td>
+      <td>WAI middleware · combineApps · EventSource</td>
+      <td style="color:#86efac;">✅ Done</td>
+    </tr>
+    <tr>
+      <td><span class="phase">5</span>MC</td>
+      <td>Multi-hart · RVWMO litmus · herd7 integration · IPI scenario</td>
+      <td>Par monad · Concurrent IO · herd7 binding</td>
+      <td style="color:#64748b;">📋 Planned</td>
+    </tr>
+    <tr>
+      <td><span class="phase">6</span>RVV</td>
+      <td>RV64V Vector extension · VLEN/ELEN param · Vector coverage bins</td>
+      <td>Parameterized types · GADT</td>
+      <td style="color:#64748b;">📋 Planned</td>
+    </tr>
+  </table>
+</section>
+
+<!-- ══════════════════════════ HASKELL SECTION TITLE ══════════════════════════ -->
+<section data-background-gradient="radial-gradient(ellipse at 30% 60%, #1e1b4b 0%, #0f172a 70%)" class="center">
+  <div style="padding:1em 0;">
+    <div style="font-size:2.5em; margin-bottom:.3em;">📚</div>
+    <h1 style="font-size:1.7em;">Haskell 學習筆記</h1>
+    <p style="color:#a78bfa; font-size:.9em; margin:.3em 0;">Learning Notes from Pooh-V</p>
+    <p class="muted" style="font-size:.75em; margin:.5em 0;">從專案中值得學習的八個 Haskell 精隨<br><em>Eight key Haskell concepts illustrated with real Pooh-V code</em></p>
+    <hr style="border-color:rgba(167,139,250,.3); width:50%; margin:1em auto;">
+    <div style="display:flex; gap:1.5em; justify-content:center; font-size:.7em; color:#94a3b8;">
+      <span>① ADT as Spec</span>
+      <span>② Newtype Safety</span>
+      <span>③ Either Errors</span>
+      <span>④ STM Concurrency</span>
+      <span>⑤ SBV Symbolic</span>
+      <span>⑥ Hedgehog</span>
+      <span>⑦ Servant API</span>
+      <span>⑧ Syntax Sugar</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ HS 1: ADT ══════════════════════════ -->
+<section>
+  <h2>① ADT 作為規格 <span class="en">ADT as Specification</span></h2>
+  <p class="muted" style="font-size:.75em;">Algebraic Data Types 直接對應問題域結構 ／ Model your domain with types, not strings</p>
+
+  <div class="grid2">
+    <div>
+      <h3>Sum Type = 「其中之一」</h3>
+      <pre><code class="language-haskell">-- 一條指令只能是其中一種
+-- 加新指令 = 加一個 constructor
+data Instruction
+  = ADD    Register Register Register
+  | ADDI   Register Register Imm12
+  | BEQ    Register Register Imm13
+  | LUI    Register Imm20
+  | MRET  -- no fields needed
+  deriving (Show, Eq, Ord, Generic)
+
+-- GHC -Wincomplete-patterns
+-- 漏掉 constructor → compile warning
+-- The compiler is your spec checker ✅</code></pre>
+
+      <h3 style="margin-top:.6em;">Product Type = 「同時有」</h3>
+      <pre><code class="language-haskell">-- R-type 格式：同時有所有欄位
+data RFormat = RFormat
+  { rFunct7 :: Word7
+  , rRs2    :: Register
+  , rRs1    :: Register
+  , rFunct3 :: Word3
+  , rRd     :: Register
+  , rOpcode :: Word7
+  }</code></pre>
+    </div>
+    <div>
+      <!-- Diagram: ADT hierarchy -->
+      <svg viewBox="0 0 320 280" style="width:100%;max-height:280px;">
+        <text x="160" y="20" text-anchor="middle" fill="#fbbf24" font-size="12" font-weight="bold">Instruction ADT 結構</text>
+
+        <!-- Root -->
+        <rect x="100" y="30" width="120" height="32" rx="6" fill="rgba(251,191,36,.2)" stroke="rgba(251,191,36,.5)" stroke-width="1.5"/>
+        <text x="160" y="51" text-anchor="middle" fill="#fde68a" font-size="11" font-weight="bold">Instruction</text>
+
+        <!-- Branches -->
+        <line x1="160" y1="62" x2="160" y2="75" stroke="#fbbf24" stroke-width="1.2"/>
+        <line x1="160" y1="75" x2="40"  y2="75" stroke="#fbbf24" stroke-width="1.2"/>
+        <line x1="160" y1="75" x2="160" y2="75" stroke="#fbbf24" stroke-width="1.2"/>
+        <line x1="160" y1="75" x2="280" y2="75" stroke="#fbbf24" stroke-width="1.2"/>
+        <line x1="40"  y1="75" x2="40"  y2="88" stroke="#fbbf24" stroke-width="1.2"/>
+        <line x1="160" y1="75" x2="160" y2="88" stroke="#fbbf24" stroke-width="1.2"/>
+        <line x1="280" y1="75" x2="280" y2="88" stroke="#fbbf24" stroke-width="1.2"/>
+
+        <!-- RV64I -->
+        <rect x="5"  y="88" width="70" height="26" rx="5" fill="rgba(96,165,250,.2)" stroke="rgba(96,165,250,.4)" stroke-width="1"/>
+        <text x="40" y="105" text-anchor="middle" fill="#93c5fd" font-size="10">RV64I</text>
+
+        <!-- RV64M -->
+        <rect x="125" y="88" width="70" height="26" rx="5" fill="rgba(167,139,250,.2)" stroke="rgba(167,139,250,.4)" stroke-width="1"/>
+        <text x="160" y="105" text-anchor="middle" fill="#c4b5fd" font-size="10">RV64M</text>
+
+        <!-- RVPriv -->
+        <rect x="245" y="88" width="70" height="26" rx="5" fill="rgba(251,113,133,.2)" stroke="rgba(251,113,133,.4)" stroke-width="1"/>
+        <text x="280" y="105" text-anchor="middle" fill="#fda4af" font-size="10">Privileged</text>
+
+        <!-- Sub-items RV64I -->
+        <line x1="40" y1="114" x2="40" y2="127" stroke="#64748b" stroke-width="1"/>
+        <line x1="40" y1="127" x2="20" y2="127" stroke="#64748b" stroke-width="1"/>
+        <line x1="40" y1="127" x2="60" y2="127" stroke="#64748b" stroke-width="1"/>
+        <line x1="20" y1="127" x2="20" y2="138" stroke="#64748b" stroke-width="1"/>
+        <line x1="60" y1="127" x2="60" y2="138" stroke="#64748b" stroke-width="1"/>
+        <rect x="5"  y="138" width="30" height="20" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+        <text x="20" y="152" text-anchor="middle" fill="#94a3b8" font-size="8.5">ADD</text>
+        <rect x="45" y="138" width="30" height="20" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+        <text x="60" y="152" text-anchor="middle" fill="#94a3b8" font-size="8.5">ADDI</text>
+
+        <!-- Sub-items RV64M -->
+        <line x1="160" y1="114" x2="160" y2="138" stroke="#64748b" stroke-width="1"/>
+        <rect x="130" y="138" width="60" height="20" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+        <text x="160" y="152" text-anchor="middle" fill="#94a3b8" font-size="8.5">MUL / DIV...</text>
+
+        <!-- Sub-items Priv -->
+        <line x1="280" y1="114" x2="280" y2="138" stroke="#64748b" stroke-width="1"/>
+        <rect x="250" y="138" width="60" height="20" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+        <text x="280" y="152" text-anchor="middle" fill="#94a3b8" font-size="8.5">MRET / WFI</text>
+
+        <!-- Key insight box -->
+        <rect x="5" y="175" width="310" height="95" rx="8" fill="rgba(251,191,36,.06)" stroke="rgba(251,191,36,.25)" stroke-width="1.2"/>
+        <text x="160" y="195" text-anchor="middle" fill="#fde68a" font-size="10" font-weight="bold">為什麼比 class hierarchy 更好？</text>
+        <text x="15" y="213" fill="#94a3b8" font-size="9">✅ 加新指令：加一個 constructor（2 行）</text>
+        <text x="15" y="228" fill="#94a3b8" font-size="9">✅ GHC 告訴你哪些 match 需要更新</text>
+        <text x="15" y="243" fill="#94a3b8" font-size="9">✅ Pattern match 在 compile time 窮舉</text>
+        <text x="15" y="258" fill="#94a3b8" font-size="9">✅ deriving (Eq, Ord) 免費得到比較函數</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ HS 2: NEWTYPE ══════════════════════════ -->
+<section>
+  <h2>② Newtype 型別安全 <span class="en">Type Safety via Newtype</span></h2>
+  <p class="muted" style="font-size:.75em;">在 compile time 阻止語意上不合理的操作，runtime 零成本 ／ Compile-time safety, zero runtime cost</p>
+
+  <div class="grid2">
+    <div>
+      <h3>問題 vs 解法 <span class="en">Problem vs Solution</span></h3>
+      <pre><code class="language-haskell">-- ❌ type alias：GHC 無法區分
+type Register   = Word8
+type FPRegister = Word8
+-- 把 FP register 傳給 GP register 槽
+-- GHC 不報錯！Bug 在 runtime 才爆
+
+-- ✅ newtype：compile time 阻止
+newtype Register   = Register   { unReg  :: Word8 }
+newtype FPRegister = FPRegister { unFReg :: Word8 }
+
+-- 嘗試混用 → Type error ✅
+encodeADD :: Register -> Register -> Register -> Word32
+-- encodeADD fp1 x1 x2   ← compile error!
+--   Expected: Register
+--   Got: FPRegister</code></pre>
+
+      <h3 style="margin-top:.6em;">Zero-cost abstraction</h3>
+      <pre><code class="language-haskell">-- GHC 在最終機器碼中完全消除 newtype wrapper
+-- 效能與 Word8 完全相同
+-- 型別安全完全免費
+
+-- Smart Constructor 模式（可選）
+mkRegister :: Word8 -> Maybe Register
+mkRegister n
+  | n <= 31   = Just (Register n)
+  | otherwise = Nothing  -- 不合法的 register</code></pre>
+    </div>
+    <div>
+      <!-- Diagram: type safety benefit -->
+      <svg viewBox="0 0 300 300" style="width:100%;max-height:300px;">
+        <text x="150" y="20" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="bold">Newtype 防止的 Bug 類型</text>
+
+        <!-- Type hierarchy visualization -->
+        <rect x="20" y="35" width="120" height="35" rx="6" fill="rgba(34,197,94,.15)" stroke="rgba(34,197,94,.4)" stroke-width="1.2"/>
+        <text x="80" y="57" text-anchor="middle" fill="#86efac" font-size="10.5" font-weight="bold">Register (Word8)</text>
+
+        <rect x="160" y="35" width="120" height="35" rx="6" fill="rgba(251,113,133,.15)" stroke="rgba(251,113,133,.4)" stroke-width="1.2"/>
+        <text x="220" y="57" text-anchor="middle" fill="#fda4af" font-size="10.5" font-weight="bold">FPRegister (Word8)</text>
+
+        <!-- Prevented arrows (red X) -->
+        <line x1="80"  y1="70" x2="80"  y2="105" stroke="#475569" stroke-width="1" stroke-dasharray="3 2"/>
+        <line x1="220" y1="70" x2="220" y2="105" stroke="#475569" stroke-width="1" stroke-dasharray="3 2"/>
+
+        <rect x="20" y="105" width="120" height="30" rx="6" fill="rgba(120,53,15,.4)" stroke="rgba(251,191,36,.4)" stroke-width="1.2"/>
+        <text x="80" y="125" text-anchor="middle" fill="#fde68a" font-size="10.5">encode ADD</text>
+
+        <!-- Cross: FPRegister can't go to Register slot -->
+        <line x1="220" y1="70" x2="80" y2="105" stroke="#dc2626" stroke-width="2" opacity=".7"/>
+        <text x="165" y="92" fill="#dc2626" font-size="20" font-weight="bold">✕</text>
+
+        <!-- Immediate types -->
+        <text x="150" y="165" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="bold">Immediate 也是獨立型別</text>
+
+        <rect x="10"  y="175" width="80" height="28" rx="5" fill="rgba(96,165,250,.2)" stroke="rgba(96,165,250,.4)" stroke-width="1"/>
+        <text x="50"  y="194" text-anchor="middle" fill="#93c5fd" font-size="9.5">Imm12 (Int16)</text>
+
+        <rect x="100" y="175" width="80" height="28" rx="5" fill="rgba(167,139,250,.2)" stroke="rgba(167,139,250,.4)" stroke-width="1"/>
+        <text x="140" y="194" text-anchor="middle" fill="#c4b5fd" font-size="9.5">Imm21 (Int32)</text>
+
+        <rect x="190" y="175" width="100" height="28" rx="5" fill="rgba(52,211,153,.2)" stroke="rgba(52,211,153,.4)" stroke-width="1"/>
+        <text x="240" y="194" text-anchor="middle" fill="#6ee7b7" font-size="9.5">UImm5 (Word8)</text>
+
+        <!-- JAL needs Imm21, not Imm12 -->
+        <rect x="60" y="218" width="180" height="30" rx="6" fill="rgba(120,53,15,.4)" stroke="rgba(251,191,36,.35)" stroke-width="1.2"/>
+        <text x="150" y="238" text-anchor="middle" fill="#fde68a" font-size="10">JAL rd (imm21 :: Imm21)</text>
+
+        <line x1="50" y1="203" x2="115" y2="218" stroke="#dc2626" stroke-width="1.5" opacity=".7"/>
+        <text x="65" y="215" fill="#dc2626" font-size="14" font-weight="bold">✕</text>
+        <text x="25" y="230" fill="#dc2626" font-size="8.5">Imm12 ≠ Imm21</text>
+
+        <line x1="140" y1="203" x2="150" y2="218" stroke="#34d399" stroke-width="1.5"/>
+        <text x="150" y="265" text-anchor="middle" fill="#86efac" font-size="9">只有 Imm21 可以傳入 ✅</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ HS 3: EITHER ══════════════════════════ -->
+<section>
+  <h2>③ Either 錯誤處理 <span class="en">Error Handling with Either</span></h2>
+  <p class="muted" style="font-size:.75em;">讓錯誤成為型別的一部分，強制 caller 處理 ／ Make failures visible in the type signature</p>
+
+  <div class="grid2">
+    <div>
+      <pre><code class="language-haskell">-- ❌ Exception 的問題：
+--   1. 型別簽名看不出可能失敗
+--   2. Caller 可能忘記 catch
+--   3. 純函數裡難以測試
+decode :: Word32 -> Instruction  -- 隱藏失敗
+
+-- ✅ Either 的優點：
+decode :: Word32 -> Either DecodeError Instruction
+
+data DecodeError
+  = UnknownOpcode    Word32
+  | UnknownFunct3    Word32 Word32
+  | ReservedEncoding Word32
+
+-- GHC 強制你處理 Left case：
+processInstruction :: Word32 -> IO ()
+processInstruction w = case decode w of
+  Right instr -> execute instr
+  Left (UnknownOpcode op) ->
+    logWarning ("bad opcode: 0x" <> showHex op "")
+  Left (ReservedEncoding raw) ->
+    raiseIllegalInstruction raw</code></pre>
+    </div>
+    <div>
+      <h3>Monad 組合 <span class="en">Monadic Chaining</span></h3>
+      <pre><code class="language-haskell">-- do-notation 讓 Either 組合很自然
+-- 任何一步 Left 就短路，不繼續執行
+processWord :: Word32 -> Either Error Result
+processWord w = do
+  instr  <- decode w              -- ① decode
+  params <- extractParams instr   -- ② validate
+  result <- process params        -- ③ execute
+  return result
+
+-- 等價於：
+processWord w =
+  decode w >>= \instr ->
+  extractParams instr >>= \params ->
+  process params >>= \result ->
+  Right result</code></pre>
+
+      <div class="hs-note" style="margin-top:.4em;">
+        <div class="lbl">拇指原則 ／ Rule of thumb</div>
+        <p>預期可能發生 → <code>Either</code> / <code>Maybe</code>。真正的程式錯誤 → <code>error</code>。<em>Expected = types; Unexpected = exceptions.</em></p>
+      </div>
+
+      <table style="margin-top:.4em; font-size:.72em;">
+        <tr><th>情況</th><th>用法</th></tr>
+        <tr><td>可能失敗，有錯誤信息</td><td><code>Either Error a</code></td></tr>
+        <tr><td>可能不存在</td><td><code>Maybe a</code></td></tr>
+        <tr><td>真的不該發生</td><td><code>error "impossible"</code></td></tr>
+        <tr><td>IO 異常</td><td><code>IOException</code></td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ HS 4: STM ══════════════════════════ -->
+<section>
+  <h2>④ STM 並發 <span class="en">Software Transactional Memory</span></h2>
+  <p class="muted" style="font-size:.75em;">比 mutex 更安全的並發原語，死鎖不可能發生 ／ Composable atomicity, deadlock-free by design</p>
+
+  <div class="grid2">
+    <div>
+      <pre><code class="language-haskell">-- TVar = STM 的可變變數
+-- atomically 保證 all-or-nothing
+data CoverageAccumulator = CoverageAccumulator
+  { caMap   :: TVar CoverageMap
+  , caTotal :: TVar Word64
+  }
+
+-- 多個 worker thread 同時更新，不需 lock
+worker :: CoverageAccumulator -> IO ()
+worker acc = do
+  bins <- runTestBatch config
+  atomically $       -- 這一整段原子執行
+    modifyTVar (caMap acc) (applyHits bins)
+
+-- STM action 可以組合！
+atomically $ do
+  modifyTVar coverageMap (addBins bins)
+  modifyTVar totalCount (+1)
+  -- 兩個操作一起成功或一起失敗</code></pre>
+    </div>
+    <div>
+      <!-- STM vs Mutex diagram -->
+      <svg viewBox="0 0 300 250" style="width:100%;max-height:250px;">
+        <text x="75"  y="20" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="bold">Mutex 方式</text>
+        <text x="225" y="20" text-anchor="middle" fill="#86efac" font-size="11" font-weight="bold">STM 方式</text>
+
+        <!-- Mutex threads -->
+        <rect x="10" y="30" width="50" height="25" rx="4" fill="rgba(96,165,250,.3)" stroke="#3b82f6" stroke-width="1"/>
+        <text x="35" y="47" text-anchor="middle" fill="#93c5fd" font-size="9">Thread A</text>
+        <rect x="80" y="30" width="50" height="25" rx="4" fill="rgba(167,139,250,.3)" stroke="#8b5cf6" stroke-width="1"/>
+        <text x="105" y="47" text-anchor="middle" fill="#c4b5fd" font-size="9">Thread B</text>
+
+        <!-- Mutex symbol -->
+        <rect x="30" y="70" width="80" height="30" rx="5" fill="rgba(220,38,38,.3)" stroke="#dc2626" stroke-width="1.5"/>
+        <text x="70" y="90" text-anchor="middle" fill="#fca5a5" font-size="10" font-weight="bold">Mutex 🔒</text>
+
+        <line x1="35"  y1="55" x2="55"  y2="70" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3 2"/>
+        <line x1="105" y1="55" x2="85"  y2="70" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3 2"/>
+
+        <rect x="10" y="115" width="120" height="40" rx="5" fill="rgba(220,38,38,.1)" stroke="rgba(220,38,38,.4)" stroke-width="1"/>
+        <text x="70" y="132" text-anchor="middle" fill="#fca5a5" font-size="9">⚠️ 需要記住 lock 順序</text>
+        <text x="70" y="148" text-anchor="middle" fill="#fca5a5" font-size="9">⚠️ 忘記 unlock → 死鎖</text>
+
+        <!-- STM threads -->
+        <rect x="155" y="30" width="50" height="25" rx="4" fill="rgba(96,165,250,.3)" stroke="#3b82f6" stroke-width="1"/>
+        <text x="180" y="47" text-anchor="middle" fill="#93c5fd" font-size="9">Thread A</text>
+        <rect x="225" y="30" width="50" height="25" rx="4" fill="rgba(167,139,250,.3)" stroke="#8b5cf6" stroke-width="1"/>
+        <text x="250" y="47" text-anchor="middle" fill="#c4b5fd" font-size="9">Thread B</text>
+
+        <rect x="155" y="70" width="120" height="30" rx="5" fill="rgba(34,197,94,.2)" stroke="rgba(34,197,94,.5)" stroke-width="1.5"/>
+        <text x="215" y="90" text-anchor="middle" fill="#86efac" font-size="10" font-weight="bold">atomically ✅</text>
+
+        <line x1="180" y1="55" x2="195" y2="70" stroke="#34d399" stroke-width="1.5"/>
+        <line x1="250" y1="55" x2="235" y2="70" stroke="#34d399" stroke-width="1.5"/>
+
+        <rect x="155" y="115" width="130" height="40" rx="5" fill="rgba(34,197,94,.1)" stroke="rgba(34,197,94,.3)" stroke-width="1"/>
+        <text x="220" y="132" text-anchor="middle" fill="#86efac" font-size="9">✅ 死鎖不可能</text>
+        <text x="220" y="148" text-anchor="middle" fill="#86efac" font-size="9">✅ 自動 retry on conflict</text>
+
+        <!-- Comparison table -->
+        <rect x="5" y="168" width="290" height="75" rx="7" fill="rgba(255,255,255,.03)" stroke="#334155" stroke-width="1"/>
+        <text x="152" y="184" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="bold">STM 額外優點</text>
+        <text x="15"  y="200" fill="#86efac" font-size="9">✅ composable: atomically (a &gt;&gt; b &gt;&gt; c)</text>
+        <text x="15"  y="215" fill="#86efac" font-size="9">✅ retry: 等條件滿足才繼續</text>
+        <text x="15"  y="230" fill="#86efac" font-size="9">✅ 型別系統保證只在 STM 內做 STM 操作</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ HS 5: SBV ══════════════════════════ -->
+<section>
+  <h2>⑤ SBV Symbolic Computation <span class="en">SMT Solving with SBV</span></h2>
+  <p class="muted" style="font-size:.75em;">把 Haskell 值「提升」到 symbolic 層面，讓 Z3 替你求解 ／ Lift values to symbolic domain; let Z3 do the math</p>
+
+  <div class="grid2">
+    <div>
+      <h3>兩個世界的對應 <span class="en">Two Worlds</span></h3>
+      <table>
+        <tr><th>Haskell (concrete)</th><th>SBV (symbolic)</th></tr>
+        <tr><td><code>Word8</code></td><td><code>SWord8</code></td></tr>
+        <tr><td><code>Int32</code></td><td><code>SInt32</code></td></tr>
+        <tr><td><code>Bool</code></td><td><code>SBool</code></td></tr>
+        <tr><td><code>(==)</code></td><td><code>(.==)</code></td></tr>
+        <tr><td><code>(&amp;&amp;)</code></td><td><code>(.&amp;&amp;)</code></td></tr>
+        <tr><td><code>(+)</code></td><td><code>(+)</code> (overloaded)</td></tr>
+      </table>
+
+      <pre><code class="language-haskell">-- Symbolic monad：建立 SMT query
+buildQuery :: Symbolic ()
+buildQuery = do
+  rd  <- sWord8 "rd"    -- 宣告 symbolic variable
+  imm <- sInt32 "imm"
+
+  -- constrain = 加入 Z3 assertion
+  constrain $ rd  .< 32      -- 0 ≤ rd < 32
+  constrain $ rd  ./= 0      -- rd ≠ x0
+  constrain $ imm .>= (-2048)
+  constrain $ imm .< 2048
+
+result <- sat buildQuery
+-- result 包含 rd, imm 的一個具體值</code></pre>
+    </div>
+    <div>
+      <h3>Constraint predicate 的魔法</h3>
+      <pre><code class="language-haskell">-- 這個函數看起來像普通 Haskell
+-- 但它建立的是 SMT assertion
+rdNotZero :: SymInstrParams -> SBool
+rdNotZero params =
+  symRd params ./= 0
+  -- 不是 Bool 比較！
+  -- 是向 Z3 聲明 "rd 不等於 0 這個約束"
+
+-- 8-byte aligned address constraint
+alignedAddr8 :: SymInstrParams -> SBool
+alignedAddr8 params =
+  let addr = symRs1 params + sext (symImm params)
+  in  addr `sMod` 8 .== 0
+  -- sext = sign extend（symbolic version）
+  -- sMod = symbolic modulo</code></pre>
+
+      <div class="hs-note" style="margin-top:.4em;">
+        <div class="lbl">精隨 ／ Key Insight</div>
+        <p>SBV 用 Haskell 的型別系統防止你在 symbolic 和 concrete 之間混用。<code>SWord8</code> 和 <code>Word8</code> 是不同型別。<em>The type system separates the two worlds.</em></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ HS 6: HEDGEHOG ══════════════════════════ -->
+<section>
+  <h2>⑥ Hedgehog Property-Based Testing</h2>
+  <p class="muted" style="font-size:.75em;">描述「性質」而非「案例」；自動找反例並縮到最小 ／ Describe invariants; auto-find and shrink counterexamples</p>
+
+  <div class="grid2">
+    <div>
+      <h3>Unit Test vs Property Test</h3>
+      <pre><code class="language-haskell">-- ❌ Unit test：只測一個具體 case
+testCase "ADD encodes correctly" $
+  encode (ADD x1 x2 x3) @?= 0x003100B3
+
+-- ✅ Property test：對所有輸入都成立
+prop_roundtrip :: Property
+prop_roundtrip = property $ do
+  instr <- forAll genSampleInstruction
+  -- Hedgehog 自動生成 100+ 個隨機 instr
+  -- 任何一個失敗都是 bug
+  decode (encode instr) === Right instr
+
+-- 在 tasty 裡使用
+testProperty "encode/decode roundtrip"
+  prop_roundtrip</code></pre>
+    </div>
+    <div>
+      <h3>Integrated Shrinking 是關鍵</h3>
+      <pre><code class="language-haskell">-- 找到失敗案例後，Hedgehog 自動縮小
+-- 不需要另外寫 Arbitrary shrink
+
+-- 例：假設 encode (BEQ x1 x2 (Imm13 4097)) 失敗
+-- Hedgehog shrinking 嘗試：
+--   BEQ x0 x0 (Imm13 4096) → 還失敗？
+--   BEQ x0 x0 (Imm13 2048) → 還失敗？
+--   BEQ x0 x0 (Imm13 0)    → 不失敗
+-- 最終回報最小反例：
+--   BEQ x0 x1 (Imm13 4096)</code></pre>
+
+      <div class="hs-note" style="margin-top:.4em;">
+        <div class="lbl">vs QuickCheck</div>
+        <p>QuickCheck 需要手動實作 <code>Arbitrary</code> 的 <code>shrink</code>。Hedgehog 的 <em>integrated shrinking</em> 從 generator 結構自動推導，不需要額外工作。</p>
+      </div>
+
+      <pre><code class="language-haskell">-- Generator 組合（Monad 介面）
+genInstruction :: Gen Instruction
+genInstruction = Gen.choice
+  [ ADD  <$> genReg <*> genReg <*> genReg
+  , ADDI <$> genReg <*> genReg <*> genImm12
+  , pure ECALL
+  ]</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ HS 7: SERVANT ══════════════════════════ -->
+<section>
+  <h2>⑦ Servant 型別安全 REST API</h2>
+  <p class="muted" style="font-size:.75em;">API 型別定義 ＝ 文件 ＝ 合約 ／ The type IS the contract. No mismatch possible.</p>
+
+  <div class="grid21">
+    <div>
+      <pre><code class="language-haskell">-- API 型別：每個 endpoint 明確定義
+-- 路徑 / 方法 / request body / response
+type RigAPI
+  =    "coverage"  :> Get  '[JSON] CoverageSnapshot
+  :<|> "bandit"    :> Get  '[JSON] BanditSnapshot
+  :<|> "run"       :> ReqBody '[JSON] RunRequest
+                   :> Post '[JSON] RunResult
+  :<|> "events"    :> StreamGet NewlineFraming
+                      '[JSON] ServerEvent  -- SSE
+
+-- Servant 從型別推導 handler 的型別
+-- 不對就不能 compile ✅
+server :: Server RigAPI
+server = getCoverage
+    :<|> getBandit
+    :<|> postRun
+    :<|> getEvents
+
+-- 各 handler 的型別被精確推導：
+getCoverage :: Handler CoverageSnapshot
+postRun     :: RunRequest -> Handler RunResult
+getEvents   :: Handler (ConduitT () ServerEvent IO ())</code></pre>
+    </div>
+    <div>
+      <h3>加新 Endpoint 的流程</h3>
+      <svg viewBox="0 0 260 210" style="width:100%;max-height:210px;">
+        <rect x="10" y="10" width="240" height="35" rx="7" fill="rgba(251,191,36,.15)" stroke="rgba(251,191,36,.4)" stroke-width="1.2"/>
+        <text x="130" y="32" text-anchor="middle" fill="#fde68a" font-size="10" font-weight="bold">① 在 type RigAPI 加一行</text>
+
+        <line x1="130" y1="45" x2="130" y2="60" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <rect x="10" y="60" width="240" height="35" rx="7" fill="rgba(220,38,38,.2)" stroke="rgba(252,165,165,.4)" stroke-width="1.2"/>
+        <text x="130" y="77" text-anchor="middle" fill="#fca5a5" font-size="10" font-weight="bold">② GHC 報錯：</text>
+        <text x="130" y="90" text-anchor="middle" fill="#fca5a5" font-size="9">"server has wrong type"</text>
+
+        <line x1="130" y1="95" x2="130" y2="110" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <rect x="10" y="110" width="240" height="35" rx="7" fill="rgba(96,165,250,.15)" stroke="rgba(96,165,250,.4)" stroke-width="1.2"/>
+        <text x="130" y="132" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="bold">③ 補上 handler</text>
+
+        <line x1="130" y1="145" x2="130" y2="160" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <rect x="10" y="160" width="240" height="35" rx="7" fill="rgba(34,197,94,.15)" stroke="rgba(34,197,94,.4)" stroke-width="1.2"/>
+        <text x="130" y="182" text-anchor="middle" fill="#86efac" font-size="10" font-weight="bold">④ 編譯通過 ✅ Done!</text>
+      </svg>
+
+      <div class="hs-note">
+        <div class="lbl">vs Express / Flask</div>
+        <p>Express 的 handler 型別是 <code>(req,res)⇒void</code>，任何東西都可以塞。Servant 的 endpoint 型別是精確的。<em>The compiler enforces the API contract for you.</em></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ HS 8: SYNTAX SUGAR ══════════════════════════ -->
+<section>
+  <h2>⑧ 好用的語法糖 <span class="en">Ergonomic Haskell Syntax</span></h2>
+  <p class="muted" style="font-size:.75em;">GHC2021 預設開啟的好用 extension ／ Language extensions that make Haskell ergonomic</p>
+
+  <div class="grid3">
+    <div>
+      <h3>LambdaCase</h3>
+      <pre><code class="language-haskell">-- 省去重複的參數名稱
+-- Without:
+instrExt instr = case instr of
+  MUL{} -> RV64M
+  MRET  -> RVPriv
+  _     -> RV64I
+
+-- With LambdaCase (GHC2021):
+instrExt = \case
+  MUL{} -> RV64M
+  MRET  -> RVPriv
+  _     -> RV64I
+
+-- 函數體很長時特別有用</code></pre>
+    </div>
+    <div>
+      <h3>Record Update Syntax</h3>
+      <pre><code class="language-haskell">-- 不可變資料 + 部分更新
+defaultCfg :: GeneratorConfig
+defaultCfg = GeneratorConfig
+  { gcExtensions = Set.singleton RV64I
+  , gcMinLength  = 10
+  , gcMaxLength  = 100
+  }
+
+-- 只更新需要的欄位
+myCfg = defaultCfg
+  { gcExtensions =
+      Set.fromList [RV64I, RV64M]
+  , gcMinLength  = 20
+  }
+-- 其他欄位繼承 default ✅</code></pre>
+    </div>
+    <div>
+      <h3>OverloadedStrings<br>+ ImportQualifiedPost</h3>
+      <pre><code class="language-haskell">-- OverloadedStrings:
+-- "text" 自動是 Text，不是 String
+cname :: Text
+cname = "rd-not-zero"  -- OK ✅
+
+-- ImportQualifiedPost:
+-- 更現代的 import 風格
+import Data.Map qualified as Map
+import Data.Set qualified as Set
+-- vs 舊風格：
+import qualified Data.Map as Map</code></pre>
+
+      <div class="hs-note" style="margin-top:.3em;">
+        <div class="lbl">Pooh-V 全部開啟</div>
+        <p><code>LambdaCase · TupleSections · OverloadedStrings · ImportQualifiedPost</code>
+        全在 <code>common-options</code> 裡，每個 module 自動生效。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ FINAL ══════════════════════════ -->
+<section data-background-gradient="radial-gradient(ellipse at 50% 50%, #3b1c08 0%, #0f172a 70%)" class="center">
+  <div style="padding:.5em 0;">
+    <div style="font-size:2.8em; margin-bottom:.2em;">🐻🍯</div>
+    <h1 style="font-size:1.9em; margin:0;">Pooh-V</h1>
+    <p style="color:#fde68a; font-size:.9em; margin:.3em 0 .1em;">
+      In search of the Hunny Pot, Pooh quietly validated every RISC-V implementation.
+    </p>
+    <p style="color:#78350f; font-size:.75em; font-style:italic;">
+      追著蜜罐跑的小熊，偷偷測試了所有 RISC-V 的實作
+    </p>
+    <hr style="border-color:rgba(251,191,36,.25); width:55%; margin:1em auto;">
+
+    <div class="grid3" style="text-align:left; font-size:.78em; margin-top:.5em; max-width:800px; margin-left:auto; margin-right:auto;">
+      <div class="card" style="text-align:center;">
+        <div class="card-title">CLI</div>
+        <code style="font-size:.85em;">pooh-v generate</code><br>
+        <code style="font-size:.85em;">pooh-v run</code><br>
+        <code style="font-size:.85em;">pooh-v server</code>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="card-title">Tests</div>
+        <div style="color:#86efac; font-size:1.1em; font-weight:bold;">103 ✅</div>
+        <div class="muted" style="font-size:.85em;">Property-based<br>Unit + Integration</div>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="card-title">Dashboard</div>
+        <div class="muted" style="font-size:.85em;">Vue3 + Pinia<br>Servant REST<br>SSE Real-time</div>
+      </div>
+    </div>
+
+    <p style="margin-top:1em; font-size:.68em; color:#475569;">
+      <span style="color:#d97706;">GitHub:</span>
+      <a href="https://github.com/lovelessless99/Pooh-V" style="color:var(--honey);">github.com/lovelessless99/Pooh-V</a>
+    </p>
+  </div>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/notes/notes.min.js"></script>
+<script>
+Reveal.initialize({
+  hash: true,
+  slideNumber: 'c/t',
+  progress: true,
+  transition: 'slide',
+  backgroundTransition: 'slide',
+  controls: true,
+  center: false,
+  width: 1200,
+  height: 700,
+  margin: 0.04,
+  plugins: [ RevealHighlight, RevealNotes ]
+});
+</script>
+</body>
+</html>
