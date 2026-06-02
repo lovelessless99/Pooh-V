@@ -4,4 +4,4 @@ import Test.Tasty
 import qualified Test.Integration.Smoke as Smoke
 
 main :: IO ()
-main = defaultMain $ testGroup "riscv-rig-integration" [Smoke.tests]
+main = defaultMain $ testGroup "pooh-v-integration" [Smoke.tests]

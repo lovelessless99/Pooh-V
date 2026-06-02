@@ -22,7 +22,7 @@ import qualified Test.Generator.Guided     as Guided
 import qualified Test.API.Server           as APIServer
 
 main :: IO ()
-main = defaultMain $ testGroup "riscv-rig"
+main = defaultMain $ testGroup "pooh-v"
   [ CoreEncode.tests
   , CoreDecode.tests
   , Atomic.tests

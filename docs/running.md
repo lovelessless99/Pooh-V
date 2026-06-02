@@ -1,10 +1,10 @@
-# Running riscv-rig
+# Running Pooh-V 🐻
 
 ## Development Mode (two terminals)
 
 **Terminal 1 — Haskell backend:**
 ```bash
-cabal run riscv-rig -- server --port 8080
+cabal run pooh-v -- server --port 8080
 ```
 
 **Terminal 2 — Vue3 frontend (hot reload):**
@@ -29,7 +29,7 @@ cd ..
 
 **Step 2: Start the backend (which also serves the frontend):**
 ```bash
-cabal run riscv-rig -- server --port 8080
+cabal run pooh-v -- server --port 8080
 ```
 
 Open http://localhost:8080 — the same server serves both the API and the dashboard.
@@ -40,7 +40,7 @@ Open http://localhost:8080 — the same server serves both the API and the dashb
 
 **Haskell unit tests:**
 ```bash
-cabal test riscv-rig-test --test-show-details=direct
+cabal test pooh-v-test --test-show-details=direct
 ```
 
 **Frontend unit tests (Vitest):**
@@ -61,17 +61,17 @@ npm run test:watch
 
 **Print version:**
 ```bash
-cabal run riscv-rig -- version
+cabal run pooh-v -- version
 ```
 
 **Generate sequences (no server):**
 ```bash
 # 10 random sequences, RV64I only
-cabal run riscv-rig -- generate --count 10
+cabal run pooh-v -- generate --count 10
 
 # With extensions
-cabal run riscv-rig -- generate --count 10 --ext A --ext M --ext F
+cabal run pooh-v -- generate --count 10 --ext A --ext M --ext F
 
 # Reproducible with fixed seed
-cabal run riscv-rig -- generate --seed 12345 --count 5
+cabal run pooh-v -- generate --seed 12345 --count 5
 ```

@@ -43,7 +43,7 @@ parseOptions = execParser opts
     opts = info (commandP <**> helper)
       (fullDesc
        <> progDesc "RISC-V Random Instruction Generator"
-       <> header   "riscv-rig -- SMT-guided RISC-V test generator")
+       <> header   "pooh-v -- SMT-guided RISC-V test generator")
 
 commandP :: Parser Command
 commandP = subparser

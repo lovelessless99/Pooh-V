@@ -23,7 +23,7 @@ import qualified Data.Set as Set
 import System.Directory          (createDirectoryIfMissing)
 
 runCommand :: Command -> IO ()
-runCommand CmdVersion = putStrLn "riscv-rig 0.1.0"
+runCommand CmdVersion = putStrLn "Pooh-V 0.1.0 \x1F36F"
 
 runCommand (CmdGenerate opts) = do
   createDirectoryIfMissing True (goOutputDir opts)
@@ -97,8 +97,8 @@ runServer opts = do
   let apiApp     = serve rigAPI (server state)
       staticApp_ = staticApp (defaultWebAppSettings "frontend/dist")
       combined   = combineApps apiApp staticApp_
-  putStrLn ("riscv-rig server listening on port " <> show (soPort opts))
-  putStrLn ("Dashboard: http://localhost:" <> show (soPort opts))
+  putStrLn ("Pooh-V is ready to hunt on port " <> show (soPort opts))
+  putStrLn ("\x1F36F Hunny Pot: http://localhost:" <> show (soPort opts))
   run (soPort opts) combined
 
 combineApps :: Application -> Application -> Application

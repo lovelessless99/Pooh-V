@@ -1,7 +1,7 @@
 cabal-version: 3.0
-name:          riscv-rig
+name:          pooh-v
 version:       0.1.0.0
-synopsis:      RISC-V Random Instruction Generator with SMT constraint solving
+synopsis:      Pooh-V: SMT-guided RISC-V Random Instruction Generator
 license:       MIT
 build-type:    Simple
 
@@ -78,7 +78,7 @@ library
     , wai             >= 3.2
     , tagged          >= 0.8
 
-executable riscv-rig
+executable pooh-v
   import:          common-options
   hs-source-dirs:  app
   main-is:         Main.hs
@@ -87,7 +87,7 @@ executable riscv-rig
     CLI.Runner
   build-depends:
       base                 >= 4.17 && < 5
-    , riscv-rig
+    , pooh-v
     , optparse-applicative >= 0.18
     , text                 >= 2.0
     , containers           >= 0.6
@@ -98,7 +98,7 @@ executable riscv-rig
     , wai-app-static  >= 3.1
     , wai             >= 3.2
 
-test-suite riscv-rig-test
+test-suite pooh-v-test
   import:          common-options
   type:            exitcode-stdio-1.0
   hs-source-dirs:  test
@@ -125,7 +125,7 @@ test-suite riscv-rig-test
     Test.API.Server
   build-depends:
       base           >= 4.17 && < 5
-    , riscv-rig
+    , pooh-v
     , hedgehog       >= 1.4
     , tasty          >= 1.4
     , tasty-hedgehog >= 1.4
@@ -140,7 +140,7 @@ test-suite riscv-rig-test
     , servant-server >= 0.20
     , aeson          >= 2.1
 
-test-suite riscv-rig-integration
+test-suite pooh-v-integration
   import:          common-options
   type:            exitcode-stdio-1.0
   hs-source-dirs:  test
@@ -149,7 +149,7 @@ test-suite riscv-rig-integration
     Test.Integration.Smoke
   build-depends:
       base           >= 4.17 && < 5
-    , riscv-rig
+    , pooh-v
     , tasty          >= 1.4
     , tasty-hunit    >= 0.10
     , process        >= 1.6
