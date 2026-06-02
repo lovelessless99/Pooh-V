@@ -8,7 +8,7 @@ export function useSSE() {
   const coverage = useCoverageStore()
   const bandit   = useBanditStore()
 
-  onMounted(() => {
+  function connect() {
     es = new EventSource('/api/stream')
     es.addEventListener('update', (e: MessageEvent) => {
       const data = JSON.parse(e.data) as SSEEvent
@@ -17,11 +17,10 @@ export function useSSE() {
     })
     es.onerror = () => {
       es?.close()
-      setTimeout(() => {
-        es = new EventSource('/api/stream')
-      }, 3000)
+      setTimeout(connect, 3000)
     }
-  })
+  }
 
+  onMounted(connect)
   onUnmounted(() => es?.close())
 }
