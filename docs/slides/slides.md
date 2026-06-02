@@ -23,12 +23,8 @@ fonts:
 /* Dark background everywhere — prevents black flash on transition */
 html, body, .slidev-container, .slidev-slide { background: #0f172a !important; }
 
-/* Hide Slidev navigation drawer / overview sidebar */
-.slidev-nav,
-.slidev-overview,
-#slidev-nav,
-[class*="slidev-nav-"] { display: none !important; }
-.slidev-controls { display: flex !important; }
+/* Hide only the slides overview sidebar (not the nav arrows) */
+.slidev-overview { display: none !important; }
 
 .slidev-layout { background: #0f172a !important; color: #e2e8f0; }
 .slidev-layout h1 { color: #fbbf24 !important; }
