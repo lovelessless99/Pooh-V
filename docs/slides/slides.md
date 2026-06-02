@@ -22,6 +22,8 @@ fonts:
 }
 /* Dark background everywhere — prevents black flash on transition */
 html, body, .slidev-container, .slidev-slide { background: #0f172a !important; }
+/* Hide autocomplete/search panel that shows on the side */
+.autocomplete-list { display: none !important; }
 
 
 .slidev-layout { background: #0f172a !important; color: #e2e8f0; }
