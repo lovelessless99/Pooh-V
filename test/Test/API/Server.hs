@@ -74,6 +74,6 @@ tests = testGroup "API.Server"
       let ev = SSEEvent
                 (CoverageResponse 5 100 5.0 [])
                 (BanditResponse [])
-      assertBool "encoded JSON contains key 'Coverage'"
-        ("\"Coverage\"" `isInfixOf` LBS.unpack (encode ev))
+      assertBool "encoded JSON contains key 'coverage'"
+        ("\"coverage\"" `isInfixOf` LBS.unpack (encode ev))
   ]

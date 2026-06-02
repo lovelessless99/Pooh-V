@@ -18,6 +18,7 @@ import Generator.Types       (defaultConfig, GeneratorConfig)
 import Data.Text             (Text)
 import Data.Aeson            (ToJSON(..), FromJSON(..), genericToJSON, genericParseJSON,
                               genericToEncoding, defaultOptions, Options(..))
+import Data.Char             (toLower)
 import GHC.Generics          (Generic)
 import Control.Concurrent.STM (TVar, newTVarIO)
 
@@ -64,9 +65,13 @@ data ScenarioRunResponse = ScenarioRunResponse
   , srCoverageHits :: [Text]
   } deriving (Show, Eq, Generic)
 
--- Strip prefix for JSON field names
+-- Strip prefix for JSON field names, lowercasing the first remaining character
 mkOpts :: String -> Options
-mkOpts p = defaultOptions { fieldLabelModifier = \s -> drop (length p) s }
+mkOpts p = defaultOptions
+  { fieldLabelModifier = \s -> case drop (length p) s of
+      []     -> []
+      (c:cs) -> toLower c : cs
+  }
 
 instance ToJSON   GenerateRequest    where
   toJSON     = genericToJSON     (mkOpts "gr")
