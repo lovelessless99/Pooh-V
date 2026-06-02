@@ -1,6 +1,10 @@
 module CLI.Runner (runCommand) where
 
 import CLI.Options
+import API.Types                 (newServerState)
+import API.Server                (rigAPI, server)
+import Network.Wai.Handler.Warp  (run)
+import Servant                   (serve)
 import Core.Instruction          (Extension(..))
 import Generator.Types           (defaultConfig, GeneratorConfig(..))
 import Generator.Seed            (newRandomSeed, seedFromWord64)
@@ -86,5 +90,7 @@ parseExtensions exts =
     parseExt _   = RV64I
 
 runServer :: ServerOptions -> IO ()
-runServer opts =
-  putStrLn ("riscv-rig server starting on port " <> show (soPort opts) <> " (not yet implemented)")
+runServer opts = do
+  state <- newServerState
+  putStrLn ("riscv-rig server listening on port " <> show (soPort opts))
+  run (soPort opts) (serve rigAPI (server state))

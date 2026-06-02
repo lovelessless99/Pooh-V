@@ -51,6 +51,8 @@ library
     Scenario.Types
     Scenario.Registry
     Scenario.Builtin.LrscInterrupt
+    API.Types
+    API.Server
   build-depends:
       base           >= 4.17  && < 5
     , text           >= 2.0
@@ -69,6 +71,9 @@ library
     , directory      >= 1.3
     , random         >= 1.2
     , mwc-random     >= 0.15
+    , servant-server >= 0.20
+    , warp           >= 3.3
+    , aeson          >= 2.1
 
 executable riscv-rig
   import:          common-options
@@ -85,6 +90,8 @@ executable riscv-rig
     , containers           >= 0.6
     , stm                  >= 2.5
     , directory            >= 1.3
+    , servant-server >= 0.20
+    , warp           >= 3.3
 
 test-suite riscv-rig-test
   import:          common-options
@@ -110,6 +117,7 @@ test-suite riscv-rig-test
     Test.Scenario.Registry
     Test.Coverage.Bandit
     Test.Generator.Guided
+    Test.API.Server
   build-depends:
       base           >= 4.17 && < 5
     , riscv-rig
@@ -124,6 +132,8 @@ test-suite riscv-rig-test
     , text           >= 2.0
     , process        >= 1.6
     , mwc-random     >= 0.15
+    , servant-server >= 0.20
+    , aeson          >= 2.1
 
 test-suite riscv-rig-integration
   import:          common-options

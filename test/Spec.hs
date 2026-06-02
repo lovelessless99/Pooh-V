@@ -19,6 +19,7 @@ import qualified Test.CoSim.Shrink      as Shrink
 import qualified Test.Scenario.Registry as Registry
 import qualified Test.Coverage.Bandit      as Bandit
 import qualified Test.Generator.Guided     as Guided
+import qualified Test.API.Server           as APIServer
 
 main :: IO ()
 main = defaultMain $ testGroup "riscv-rig"
@@ -40,4 +41,5 @@ main = defaultMain $ testGroup "riscv-rig"
   , Registry.tests
   , Bandit.tests
   , Guided.tests
+  , APIServer.tests
   ]
