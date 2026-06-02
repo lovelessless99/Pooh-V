@@ -26,4 +26,4 @@ recordCoverage acc bins =
 snapshotCoverage :: CoverageAccumulator -> IO CoverageSummary
 snapshotCoverage acc = do
   m <- readTVarIO (covTVar acc)
-  return (coverageSummary m allOpcodeBins)
+  return (coverageSummary m allCoverageBins)

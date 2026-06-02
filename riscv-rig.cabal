@@ -35,6 +35,7 @@ library
     Coverage.Types
     Coverage.Accumulator
     Coverage.Analysis
+    Coverage.Classify
     Coverage.Detector
     Coverage.Builtin.Detectors
     ELF.FlatBinary
