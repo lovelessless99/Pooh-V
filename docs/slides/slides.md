@@ -48,6 +48,22 @@ fonts:
 .card.red   { background:linear-gradient(135deg,rgba(220,38,38,.15),rgba(252,165,165,.05)); border-color:rgba(252,165,165,.3); }
 .card.violet{ background:linear-gradient(135deg,rgba(109,40,217,.2),rgba(167,139,250,.06)); border-color:rgba(167,139,250,.3); }
 .hs-note { background:linear-gradient(90deg,rgba(29,78,216,.15),transparent); border-left:3px solid #fbbf24; padding:.45em .8em; border-radius:0 8px 8px 0; margin:.4em 0; }
+
+/* Dense slides: scale down everything */
+.slidev-page-3 .slidev-layout,
+.slidev-page-12 .slidev-layout,
+.slidev-page-15 .slidev-layout {
+  font-size: 12px !important;
+}
+.slidev-page-3 .slidev-layout p,
+.slidev-page-3 .slidev-layout li,
+.slidev-page-12 .slidev-layout p,
+.slidev-page-12 .slidev-layout li,
+.slidev-page-15 .slidev-layout p,
+.slidev-page-15 .slidev-layout li { font-size: 1em !important; }
+.slidev-page-15 table { font-size: .78em !important; }
+.slidev-page-15 table td, .slidev-page-15 table th { padding: .2em .5em !important; }
+.slidev-page-3 h2, .slidev-page-12 h2, .slidev-page-15 h2 { font-size: 1.2em !important; margin-bottom: .2em !important; }
 </style>
 
 <div class="text-center pt-8">
@@ -747,7 +763,7 @@ export function useSSE() {
 
 # 六階段 Roadmap <span class="en">Six-Phase Roadmap</span>
 
-<svg viewBox="0 0 880 75" style="width:100%;max-height:70px;" class="mb-4">
+<svg viewBox="0 0 880 75" style="width:100%;max-height:55px;" class="mb-2">
   <rect x="20" y="33" width="840" height="8" rx="4" fill="#1e293b"/>
   <rect x="20" y="33" width="560" height="8" rx="4" fill="#d97706"/>
   <circle cx="90"  cy="37" r="14" fill="#d97706" stroke="#fbbf24" stroke-width="2"/>
