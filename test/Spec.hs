@@ -10,6 +10,7 @@ import qualified Test.Constraint.Solver as CSolver
 import qualified Test.Generator.Random  as GenRandom
 import qualified Test.Coverage.Accumulator as CovAccum
 import qualified Test.Coverage.Bins        as CovBins
+import qualified Test.Coverage.Classify    as Classify
 import qualified Test.ELF.FlatBinary    as ELFTest
 import qualified Test.CoSim.Spike       as SpikeTest
 import qualified Test.Core.ExtDeps      as ExtDeps
@@ -28,6 +29,7 @@ main = defaultMain $ testGroup "riscv-rig"
   , GenRandom.tests
   , CovAccum.tests
   , CovBins.tests
+  , Classify.tests
   , ELFTest.tests
   , SpikeTest.tests
   , ExtDeps.tests

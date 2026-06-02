@@ -95,6 +95,7 @@ test-suite riscv-rig-test
     Test.Generator.Random
     Test.Coverage.Accumulator
     Test.Coverage.Bins
+    Test.Coverage.Classify
     Test.ELF.FlatBinary
     Test.CoSim.Spike
     Test.Core.ExtDeps
