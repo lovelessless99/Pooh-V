@@ -18,7 +18,6 @@ module Coverage.Builtin.Detectors
 
 import Core.Instruction (Instruction(..))
 import Core.Types       (Register(..), Imm13(..), unReg)
-import Data.List        (tails)
 
 -- ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -37,12 +36,6 @@ scRd :: Instruction -> Maybe Register
 scRd (SC_W rd _ _ _) = Just rd
 scRd (SC_D rd _ _ _) = Just rd
 scRd _               = Nothing
-
-isLoad :: Instruction -> Bool
-isLoad i = case i of
-  LB{}  -> True; LH{}  -> True; LW{}  -> True; LD{}  -> True
-  LBU{} -> True; LHU{} -> True; LWU{} -> True
-  _     -> False
 
 -- Destination register of a load (first field for all loads).
 loadRd :: Instruction -> Maybe Register
@@ -126,12 +119,6 @@ usesReg r i = case i of
   CSRRC _ _ rs1    -> r == rs1
   SFENCE_VMA rs1 rs2 -> r == rs1 || r == rs2
   _                -> False
-
-isBranch :: Instruction -> Bool
-isBranch i = case i of
-  BEQ{}  -> True; BNE{}  -> True; BLT{}  -> True
-  BGE{}  -> True; BLTU{} -> True; BGEU{} -> True
-  _      -> False
 
 branchOffset :: Instruction -> Maybe Int
 branchOffset i = case i of
