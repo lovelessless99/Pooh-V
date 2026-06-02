@@ -35,6 +35,8 @@ library
     Coverage.Types
     Coverage.Accumulator
     Coverage.Analysis
+    Coverage.Detector
+    Coverage.Builtin.Detectors
     ELF.FlatBinary
     CoSim.Types
     CoSim.Oracle
