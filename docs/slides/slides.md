@@ -47,14 +47,18 @@ html, body, .slidev-container, .slidev-slide { background: #0f172a !important; }
 .card.violet{ background:linear-gradient(135deg,rgba(109,40,217,.2),rgba(167,139,250,.06)); border-color:rgba(167,139,250,.3); }
 .hs-note { background:linear-gradient(90deg,rgba(29,78,216,.15),transparent); border-left:3px solid #fbbf24; padding:.45em .8em; border-radius:0 8px 8px 0; margin:.4em 0; }
 
-/* Dense slides — tighter spacing and smaller text */
-.dense h2 { font-size: 1.1em !important; margin-bottom: .15em !important; }
-.dense p, .dense li { font-size: .78em !important; line-height: 1.35 !important; }
-.dense pre code { font-size: .68em !important; line-height: 1.35 !important; }
-.dense table { font-size: .72em !important; }
-.dense table td, .dense table th { padding: .2em .45em !important; }
-.dense .card { padding: .45em .7em !important; }
-.dense .hs-note { padding: .3em .6em !important; margin: .25em 0 !important; }
+/* Dense slides — class lands ON .slidev-layout, so use .slidev-layout.dense */
+.slidev-layout.dense { font-size: 11px !important; line-height: 1.3 !important; }
+.slidev-layout.dense h2 { font-size: 1.4em !important; margin: .1em 0 .2em !important; }
+.slidev-layout.dense p,
+.slidev-layout.dense li { font-size: 1em !important; line-height: 1.3 !important; margin: .1em 0 !important; }
+.slidev-layout.dense pre { margin: .15em 0 !important; }
+.slidev-layout.dense pre code { font-size: .88em !important; line-height: 1.3 !important; }
+.slidev-layout.dense table { font-size: .88em !important; }
+.slidev-layout.dense table td,
+.slidev-layout.dense table th { padding: .15em .4em !important; }
+.slidev-layout.dense .card { padding: .35em .65em !important; margin: .15em 0 !important; }
+.slidev-layout.dense .hs-note { padding: .25em .55em !important; margin: .2em 0 !important; }
 </style>
 
 <div class="text-center pt-8">
