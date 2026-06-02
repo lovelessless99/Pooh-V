@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "slidev --open",
-    "build": "slidev build --base /Pooh-V/slides/",
+    "build": "slidev build --base /Pooh-V/",
     "export": "slidev export"
   },
   "dependencies": {
