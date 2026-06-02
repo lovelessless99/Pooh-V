@@ -4,7 +4,6 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Coverage.Bandit
 import Coverage.Types  (CoverageBin(..), allCoverageBins)
-import Data.Set        (Set)
 import qualified Data.Set        as Set
 import qualified Data.Map.Strict as Map
 import Data.Text       (pack)

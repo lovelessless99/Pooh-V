@@ -56,8 +56,8 @@ updateBandit :: BanditState -> [CoverageBin] -> BanditState
 updateBandit bs hits =
   let hitSet = Set.fromList hits
       update b p@(BetaParams a bv)
-        | Set.member b hitSet              = BetaParams (a + 1) bv
         | Set.member b (bsInfeasible bs)   = p
+        | Set.member b hitSet              = BetaParams (a + 1) bv
         | otherwise                        = BetaParams a (bv + 1)
   in  bs { bsParams = Map.mapWithKey update (bsParams bs) }
 
