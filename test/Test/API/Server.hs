@@ -7,6 +7,9 @@ import API.Server  (handleGenerate, handleGetCoverage, handleResetCoverage, hand
 import Servant.Server (runHandler)
 import Data.Text   (pack)
 import Data.Aeson  (encode, decode)
+import Control.Concurrent.STM    (readTVarIO)
+import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.List                 (isInfixOf)
 
 tests :: TestTree
 tests = testGroup "API.Server"
@@ -52,4 +55,25 @@ tests = testGroup "API.Server"
   , testCase "GenerateRequest JSON round-trips" $ do
       let req = GenerateRequest [pack "RV64I"] 3 (pack "random") 5 20
       decode (encode req) @?= Just req
+
+  , testCase "handleGenerate increments ssGenCounter" $ do
+      state <- newServerState
+      let req = GenerateRequest
+            { grExtensions = [pack "RV64I"]
+            , grCount      = 1
+            , grMode       = pack "random"
+            , grLengthMin  = 5
+            , grLengthMax  = 10
+            }
+      before <- readTVarIO (ssGenCounter state)
+      _ <- runHandler (handleGenerate state req)
+      after  <- readTVarIO (ssGenCounter state)
+      after @?= before + 1
+
+  , testCase "SSEEvent JSON encodes coverage as 'coverage' key" $ do
+      let ev = SSEEvent
+                (CoverageResponse 5 100 5.0 [])
+                (BanditResponse [])
+      assertBool "encoded JSON contains key 'Coverage'"
+        ("\"Coverage\"" `isInfixOf` LBS.unpack (encode ev))
   ]

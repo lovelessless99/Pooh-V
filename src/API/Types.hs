@@ -6,6 +6,7 @@ module API.Types
   , BinInfo(..)
   , ScenarioInfo(..)
   , ScenarioRunResponse(..)
+  , SSEEvent(..)
   , ServerState(..)
   , newServerState
   ) where
@@ -102,10 +103,21 @@ instance ToJSON   ScenarioRunResponse where
   toEncoding = genericToEncoding (mkOpts "sr")
 instance FromJSON ScenarioRunResponse where parseJSON = genericParseJSON (mkOpts "sr")
 
+data SSEEvent = SSEEvent
+  { evCoverage :: CoverageResponse
+  , evBandit   :: BanditResponse
+  } deriving (Show, Eq, Generic)
+
+instance ToJSON   SSEEvent where
+  toJSON     = genericToJSON     (mkOpts "ev")
+  toEncoding = genericToEncoding (mkOpts "ev")
+instance FromJSON SSEEvent where parseJSON = genericParseJSON (mkOpts "ev")
+
 data ServerState = ServerState
   { ssAccumulator :: CoverageAccumulator
   , ssBandit      :: TVar BanditState
   , ssConfig      :: GeneratorConfig
+  , ssGenCounter  :: TVar Int
   }
 
 newServerState :: IO ServerState
@@ -113,3 +125,4 @@ newServerState = ServerState
   <$> newAccumulator
   <*> newTVarIO (initBandit allCoverageBins)
   <*> pure defaultConfig
+  <*> newTVarIO 0
