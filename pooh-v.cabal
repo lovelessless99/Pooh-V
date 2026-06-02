@@ -82,6 +82,7 @@ executable pooh-v
   import:          common-options
   hs-source-dirs:  app
   main-is:         Main.hs
+  ghc-options:     -threaded -rtsopts -with-rtsopts=-N
   other-modules:
     CLI.Options
     CLI.Runner
