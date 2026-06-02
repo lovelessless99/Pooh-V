@@ -5,6 +5,7 @@ highlighter: shiki
 transition: slide-left
 mdc: true
 colorSchema: dark
+canvasWidth: 1100
 fonts:
   sans: Segoe UI, system-ui, sans-serif
   mono: JetBrains Mono, Consolas, monospace
@@ -19,7 +20,19 @@ fonts:
   --violet: #6d28d9;
   --blue: #1d4ed8;
 }
-.slidev-layout { background: #0f172a; }
+/* Hide Slidev navigation drawer / overview sidebar */
+.slidev-nav,
+.slidev-overview,
+#slidev-nav,
+[class*="slidev-nav-"] { display: none !important; }
+/* Restore only the bottom control bar */
+.slidev-controls { display: flex !important; }
+
+.slidev-layout { background: #0f172a !important; }
+.slidev-layout h1 { color: #fbbf24 !important; }
+.slidev-layout h2 { color: #fbbf24 !important; font-size: 1.4em !important; margin-bottom: .4em; }
+.slidev-layout p, .slidev-layout li { font-size: .82em; }
+
 .badge { display:inline-block; padding:1px 10px; border-radius:999px; font-size:.7em; font-weight:700; margin:2px; }
 .b-honey  { background:#d97706; color:#fff; }
 .b-forest { background:#14532d; color:#fff; }
@@ -29,12 +42,12 @@ fonts:
 .phase { display:inline-block; background:#78350f; color:#fbbf24; font-weight:800; font-size:.7em; padding:1px 7px; border-radius:4px; margin-right:6px; }
 .en { color:#94a3b8; font-style:italic; font-size:.88em; }
 .muted { color:#6b7280; }
-.card { background:linear-gradient(135deg,rgba(251,191,36,.07),rgba(120,53,15,.12)); border:1px solid rgba(251,191,36,.25); border-radius:10px; padding:.75em 1em; }
+.card { background:linear-gradient(135deg,rgba(251,191,36,.07),rgba(120,53,15,.12)); border:1px solid rgba(251,191,36,.25); border-radius:10px; padding:.65em .9em; }
 .card.green { background:linear-gradient(135deg,rgba(20,83,45,.2),rgba(34,197,94,.06)); border-color:rgba(34,197,94,.3); }
 .card.blue  { background:linear-gradient(135deg,rgba(29,78,216,.2),rgba(96,165,250,.06)); border-color:rgba(96,165,250,.3); }
 .card.red   { background:linear-gradient(135deg,rgba(220,38,38,.15),rgba(252,165,165,.05)); border-color:rgba(252,165,165,.3); }
 .card.violet{ background:linear-gradient(135deg,rgba(109,40,217,.2),rgba(167,139,250,.06)); border-color:rgba(167,139,250,.3); }
-.hs-note { background:linear-gradient(90deg,rgba(29,78,216,.15),transparent); border-left:3px solid #fbbf24; padding:.5em .9em; border-radius:0 8px 8px 0; margin:.5em 0; }
+.hs-note { background:linear-gradient(90deg,rgba(29,78,216,.15),transparent); border-left:3px solid #fbbf24; padding:.45em .8em; border-radius:0 8px 8px 0; margin:.4em 0; }
 </style>
 
 <div class="text-center pt-8">
