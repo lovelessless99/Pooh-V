@@ -70,6 +70,12 @@ extractImm instr = case instr of
   LHU   _ _ (Imm12 v) -> Just (fromIntegral v)
   LWU   _ _ (Imm12 v) -> Just (fromIntegral v)
   JALR  _ _ (Imm12 v) -> Just (fromIntegral v)
+  SB    _ _ (Imm12 v) -> Just (fromIntegral v)
+  SH    _ _ (Imm12 v) -> Just (fromIntegral v)
+  SW    _ _ (Imm12 v) -> Just (fromIntegral v)
+  SD    _ _ (Imm12 v) -> Just (fromIntegral v)
+  FSW   _ _ (Imm12 v) -> Just (fromIntegral v)
+  FSD   _ _ (Imm12 v) -> Just (fromIntegral v)
   _                   -> Nothing
 
 classifyImm :: Int -> [ValueCategory]
@@ -77,6 +83,8 @@ classifyImm v = concatMap (\(cond, cat) -> if cond then [cat] else []) $
   [ (v == 0,                   Zero)
   , (v == 1,                   One)
   , (v == -1,                  AllOnes)
+  , (v == 2047,                MaxPositive)
+  , (v == -2048,               MinNegative)
   , (v > 0 && v < 16,          SmallPositive)
   , (v > 0 && v `mod` 4 == 0,  AlignedAddr)
   , (v > 0 && v `mod` 4 /= 0,  UnalignedAddr)
