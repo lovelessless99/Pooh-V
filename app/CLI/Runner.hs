@@ -6,6 +6,7 @@ import Generator.Types           (defaultConfig, GeneratorConfig(..))
 import Generator.Seed            (newRandomSeed, seedFromWord64)
 import Generator.Random          (generateSequence)
 import Coverage.Accumulator      (newAccumulator, recordCoverage, snapshotCoverage)
+import Coverage.Classify         (classifySequence)
 import Coverage.Analysis         (renderSummary)
 import CoSim.Batch               (BatchConfig(..), defaultBatchConfig, runBatch, brPassed, brFailed)
 import CoSim.Spike               (defaultSpikeConfig, SpikeConfig(..))
@@ -37,6 +38,8 @@ runCommand (CmdGenerate opts) = do
               <> " (" <> show (length seq_) <> " instructions)")
     ) [1..goCount opts]
 
+runCommand (CmdServer opts) = runServer opts
+
 runCommand (CmdRun opts) = do
   createDirectoryIfMissing True (roOutputDir opts)
   seed <- maybe newRandomSeed (return . seedFromWord64) (roSeed opts)
@@ -62,7 +65,8 @@ runCommand (CmdRun opts) = do
                       , tpExit        = []
                       }) seqs
     result <- runBatch batchCfg progs
-    atomically $ recordCoverage acc []  -- placeholder: Phase 2 populates bins
+    let allBins = concatMap classifySequence seqs
+    atomically $ recordCoverage acc allBins
     putStrLn ("  Passed: " <> show (brPassed result)
               <> "  Failed: " <> show (brFailed result))
     snap <- snapshotCoverage acc
@@ -74,5 +78,13 @@ parseExtensions exts =
   Set.fromList (RV64I : map parseExt exts)
   where
     parseExt "M" = RV64M
+    parseExt "A" = RV64A
+    parseExt "F" = RV64F
+    parseExt "D" = RV64D
+    parseExt "C" = RV64C
     parseExt "P" = RVPriv
     parseExt _   = RV64I
+
+runServer :: ServerOptions -> IO ()
+runServer opts =
+  putStrLn ("riscv-rig server starting on port " <> show (soPort opts) <> " (not yet implemented)")

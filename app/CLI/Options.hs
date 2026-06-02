@@ -2,6 +2,7 @@ module CLI.Options
   ( Command(..)
   , RunOptions(..)
   , GenerateOptions(..)
+  , ServerOptions(..)
   , parseOptions
   ) where
 
@@ -11,6 +12,7 @@ import Data.Word (Word64)
 data Command
   = CmdRun      RunOptions
   | CmdGenerate GenerateOptions
+  | CmdServer   ServerOptions
   | CmdVersion
   deriving (Show)
 
@@ -31,6 +33,10 @@ data GenerateOptions = GenerateOptions
   , goOutputDir  :: FilePath
   } deriving (Show)
 
+data ServerOptions = ServerOptions
+  { soPort :: Int
+  } deriving (Show)
+
 parseOptions :: IO Command
 parseOptions = execParser opts
   where
@@ -47,6 +53,9 @@ commandP = subparser
   <> command "generate"
       (info (CmdGenerate <$> generateOptionsP)
             (progDesc "Generate ELF files without running co-simulation"))
+  <> command "server"
+      (info (CmdServer <$> serverOptionsP)
+            (progDesc "Start REST API server"))
   <> command "version"
       (info (pure CmdVersion) (progDesc "Print version"))
   )
@@ -68,6 +77,11 @@ runOptionsP = RunOptions
                  <> help "Path to spike binary")
   <*> strOption (long "output" <> short 'o' <> metavar "DIR" <> value "output"
                  <> showDefault <> help "Output directory")
+
+serverOptionsP :: Parser ServerOptions
+serverOptionsP = ServerOptions
+  <$> option auto (long "port" <> short 'p' <> metavar "PORT"
+                   <> value 8080 <> showDefault <> help "Port to listen on")
 
 generateOptionsP :: Parser GenerateOptions
 generateOptionsP = GenerateOptions
