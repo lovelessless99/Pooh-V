@@ -3,8 +3,10 @@ module CLI.Runner (runCommand) where
 import CLI.Options
 import API.Types                 (newServerState)
 import API.Server                (rigAPI, server)
-import Network.Wai.Handler.Warp  (run)
-import Servant                   (serve)
+import Network.Wai                     (Application, Request(..))
+import Network.Wai.Application.Static  (staticApp, defaultWebAppSettings)
+import Network.Wai.Handler.Warp        (run)
+import Servant                         (serve)
 import Core.Instruction          (Extension(..))
 import Generator.Types           (defaultConfig, GeneratorConfig(..))
 import Generator.Seed            (newRandomSeed, seedFromWord64)
@@ -92,5 +94,15 @@ parseExtensions exts =
 runServer :: ServerOptions -> IO ()
 runServer opts = do
   state <- newServerState
+  let apiApp     = serve rigAPI (server state)
+      staticApp_ = staticApp (defaultWebAppSettings "frontend/dist")
+      combined   = combineApps apiApp staticApp_
   putStrLn ("riscv-rig server listening on port " <> show (soPort opts))
-  run (soPort opts) (serve rigAPI (server state))
+  putStrLn ("Dashboard: http://localhost:" <> show (soPort opts))
+  run (soPort opts) combined
+
+combineApps :: Application -> Application -> Application
+combineApps api static_ req respond =
+  case pathInfo req of
+    ("api":rest) -> api req { pathInfo = rest } respond
+    _            -> static_ req respond

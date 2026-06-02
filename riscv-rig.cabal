@@ -95,6 +95,8 @@ executable riscv-rig
     , directory            >= 1.3
     , servant-server >= 0.20
     , warp           >= 3.3
+    , wai-app-static  >= 3.1
+    , wai             >= 3.2
 
 test-suite riscv-rig-test
   import:          common-options
