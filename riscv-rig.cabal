@@ -32,6 +32,7 @@ library
     Generator.Seed
     Generator.Types
     Generator.Random
+    Generator.Guided
     Coverage.Types
     Coverage.Accumulator
     Coverage.Analysis
@@ -108,6 +109,7 @@ test-suite riscv-rig-test
     Test.CoSim.Shrink
     Test.Scenario.Registry
     Test.Coverage.Bandit
+    Test.Generator.Guided
   build-depends:
       base           >= 4.17 && < 5
     , riscv-rig

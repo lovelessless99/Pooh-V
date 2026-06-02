@@ -18,6 +18,7 @@ import qualified Test.Core.PMA          as PMA
 import qualified Test.CoSim.Shrink      as Shrink
 import qualified Test.Scenario.Registry as Registry
 import qualified Test.Coverage.Bandit      as Bandit
+import qualified Test.Generator.Guided     as Guided
 
 main :: IO ()
 main = defaultMain $ testGroup "riscv-rig"
@@ -38,4 +39,5 @@ main = defaultMain $ testGroup "riscv-rig"
   , Shrink.tests
   , Registry.tests
   , Bandit.tests
+  , Guided.tests
   ]
