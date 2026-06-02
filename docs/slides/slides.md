@@ -2,7 +2,7 @@
 theme: default
 title: Pooh-V — SMT-Guided RISC-V Random Instruction Generator
 highlighter: shiki
-transition: slide-left
+transition: fade
 mdc: true
 colorSchema: dark
 canvasWidth: 1100
@@ -20,17 +20,19 @@ fonts:
   --violet: #6d28d9;
   --blue: #1d4ed8;
 }
+/* Dark background everywhere — prevents black flash on transition */
+html, body, .slidev-container, .slidev-slide { background: #0f172a !important; }
+
 /* Hide Slidev navigation drawer / overview sidebar */
 .slidev-nav,
 .slidev-overview,
 #slidev-nav,
 [class*="slidev-nav-"] { display: none !important; }
-/* Restore only the bottom control bar */
 .slidev-controls { display: flex !important; }
 
-.slidev-layout { background: #0f172a !important; }
+.slidev-layout { background: #0f172a !important; color: #e2e8f0; }
 .slidev-layout h1 { color: #fbbf24 !important; }
-.slidev-layout h2 { color: #fbbf24 !important; font-size: 1.4em !important; margin-bottom: .4em; }
+.slidev-layout h2 { color: #fbbf24 !important; font-size: 1.35em !important; margin-bottom: .25em !important; }
 .slidev-layout p, .slidev-layout li { font-size: .82em; }
 
 .badge { display:inline-block; padding:1px 10px; border-radius:999px; font-size:.7em; font-weight:700; margin:2px; }
@@ -49,21 +51,14 @@ fonts:
 .card.violet{ background:linear-gradient(135deg,rgba(109,40,217,.2),rgba(167,139,250,.06)); border-color:rgba(167,139,250,.3); }
 .hs-note { background:linear-gradient(90deg,rgba(29,78,216,.15),transparent); border-left:3px solid #fbbf24; padding:.45em .8em; border-radius:0 8px 8px 0; margin:.4em 0; }
 
-/* Dense slides: scale down everything */
-.slidev-page-3 .slidev-layout,
-.slidev-page-12 .slidev-layout,
-.slidev-page-15 .slidev-layout {
-  font-size: 12px !important;
-}
-.slidev-page-3 .slidev-layout p,
-.slidev-page-3 .slidev-layout li,
-.slidev-page-12 .slidev-layout p,
-.slidev-page-12 .slidev-layout li,
-.slidev-page-15 .slidev-layout p,
-.slidev-page-15 .slidev-layout li { font-size: 1em !important; }
-.slidev-page-15 table { font-size: .78em !important; }
-.slidev-page-15 table td, .slidev-page-15 table th { padding: .2em .5em !important; }
-.slidev-page-3 h2, .slidev-page-12 h2, .slidev-page-15 h2 { font-size: 1.2em !important; margin-bottom: .2em !important; }
+/* Dense slides — tighter spacing and smaller text */
+.dense h2 { font-size: 1.1em !important; margin-bottom: .15em !important; }
+.dense p, .dense li { font-size: .78em !important; line-height: 1.35 !important; }
+.dense pre code { font-size: .68em !important; line-height: 1.35 !important; }
+.dense table { font-size: .72em !important; }
+.dense table td, .dense table th { padding: .2em .45em !important; }
+.dense .card { padding: .45em .7em !important; }
+.dense .hs-note { padding: .3em .6em !important; margin: .25em 0 !important; }
 </style>
 
 <div class="text-center pt-8">
@@ -134,6 +129,8 @@ fonts:
   </div>
 </div>
 
+---
+class: dense
 ---
 
 # 系統架構 <span class="en">System Architecture</span>
@@ -595,6 +592,8 @@ lrscInterruptScenario = do
 </div>
 
 ---
+class: dense
+---
 
 # <span class="phase">Phase 3</span> Thompson Sampling Bandit
 
@@ -759,6 +758,8 @@ export function useSSE() {
 </div>
 </div>
 
+---
+class: dense
 ---
 
 # 六階段 Roadmap <span class="en">Six-Phase Roadmap</span>
