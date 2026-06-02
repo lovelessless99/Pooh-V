@@ -9,6 +9,7 @@ module API.Server
   , handleGetBandit
   , handleGetScenarios
   , handleRunScenario
+  , handleStream
   ) where
 
 import API.Types
@@ -23,8 +24,12 @@ import Scenario.Types        (ScenarioSpec(..))
 import Data.Text             (Text, pack)
 import Data.Map.Strict       (toAscList)
 import qualified Data.Map.Strict as Map
-import Control.Concurrent.STM (atomically, readTVarIO, modifyTVar')
+import Control.Concurrent.STM (atomically, readTVar, readTVarIO, modifyTVar', retry)
 import Control.Monad.IO.Class (liftIO)
+import Network.Wai.EventSource  (ServerEvent(..), eventSourceAppIO)
+import Data.ByteString.Builder  (byteString, lazyByteString)
+import Data.Aeson               (encode)
+import Data.IORef               (newIORef, readIORef, writeIORef)
 import Servant
 
 -- ── API type ──────────────────────────────────────────────────────────────
@@ -36,6 +41,7 @@ type RigAPI =
   :<|> "bandit"    :> Get '[JSON] BanditResponse
   :<|> "scenarios" :> Get '[JSON] [ScenarioInfo]
   :<|> "scenarios" :> Capture "name" Text :> "run" :> Post '[JSON] ScenarioRunResponse
+  :<|> "stream"    :> Raw
 
 rigAPI :: Proxy RigAPI
 rigAPI = Proxy
@@ -50,6 +56,7 @@ server state =
   :<|> handleGetBandit     state
   :<|> handleGetScenarios
   :<|> handleRunScenario   state
+  :<|> handleStream        state
 
 -- ── Handlers ─────────────────────────────────────────────────────────────
 
@@ -64,6 +71,7 @@ handleGenerate state req = liftIO $ do
   atomically $ recordCoverage (ssAccumulator state) allBins
   atomically $ modifyTVar' (ssBandit state) (\b -> updateBandit b allBins)
   snap <- snapshotCoverage (ssAccumulator state)
+  atomically $ modifyTVar' (ssGenCounter state) (+1)
   return GenerateResponse
     { grSeqs     = map (map (pack . show)) seqs
     , grCoverage = toCoverageResponse snap
@@ -80,10 +88,10 @@ handleResetCoverage state = liftIO $ do
   return NoContent
 
 handleGetBandit :: ServerState -> Handler BanditResponse
-handleGetBandit state = liftIO $ do
-  bs <- readTVarIO (ssBandit state)
-  let binInfos = map toBinInfo (toAscList (bsParams bs))
-  return BanditResponse { brBins = binInfos }
+handleGetBandit state = liftIO $ toBanditResponse <$> readTVarIO (ssBandit state)
+
+toBanditResponse :: BanditState -> BanditResponse
+toBanditResponse bs = BanditResponse { brBins = map toBinInfo (toAscList (bsParams bs)) }
   where
     toBinInfo (bin, BetaParams a b) = BinInfo
       { biName     = pack (show bin)
@@ -112,6 +120,26 @@ handleRunScenario state name = case findByName name of
       { srSequence     = map (pack . show) seq_
       , srCoverageHits = map (pack . show) bins
       }
+
+handleStream :: ServerState -> Tagged Handler Application
+handleStream state = Tagged $ \req sendResponse -> do
+  lastRef <- newIORef =<< readTVarIO (ssGenCounter state)
+  eventSourceAppIO (nextEvent lastRef) req sendResponse
+  where
+    nextEvent lastRef = do
+      last_ <- readIORef lastRef
+      newCount <- atomically $ do
+        c <- readTVar (ssGenCounter state)
+        if c > last_ then return c else retry
+      writeIORef lastRef newCount
+      snap <- snapshotCoverage (ssAccumulator state)
+      bs   <- readTVarIO (ssBandit state)
+      let evt = SSEEvent (toCoverageResponse snap) (toBanditResponse bs)
+      return $ ServerEvent
+        { eventName = Just (byteString "update")
+        , eventId   = Nothing
+        , eventData = [lazyByteString (encode evt)]
+        }
 
 -- ── Helper ────────────────────────────────────────────────────────────────
 
