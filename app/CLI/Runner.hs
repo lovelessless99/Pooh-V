@@ -23,7 +23,7 @@ import qualified Data.Set as Set
 import System.Directory          (createDirectoryIfMissing)
 
 runCommand :: Command -> IO ()
-runCommand CmdVersion = putStrLn "Pooh-V 0.1.0 \x1F36F"
+runCommand CmdVersion = putStrLn "Pooh-V 0.1.0"
 
 runCommand (CmdGenerate opts) = do
   createDirectoryIfMissing True (goOutputDir opts)
@@ -98,7 +98,7 @@ runServer opts = do
       staticApp_ = staticApp (defaultWebAppSettings "frontend/dist")
       combined   = combineApps apiApp staticApp_
   putStrLn ("Pooh-V is ready to hunt on port " <> show (soPort opts))
-  putStrLn ("\x1F36F Hunny Pot: http://localhost:" <> show (soPort opts))
+  putStrLn ("Hunny Pot: http://localhost:" <> show (soPort opts))
   run (soPort opts) combined
 
 combineApps :: Application -> Application -> Application
