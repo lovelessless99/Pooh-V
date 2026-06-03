@@ -5,8 +5,10 @@ import API.Types                 (newServerState)
 import API.Server                (rigAPI, server)
 import Network.Wai                     (Application, Request(..))
 import Network.Wai.Application.Static  (staticApp, defaultWebAppSettings)
-import Network.Wai.Handler.Warp        (run)
+import Network.Wai.Handler.Warp        (runSettings, defaultSettings, setPort, setLogger, setOnException, setOnOpen, setOnClose)
 import Servant                         (serve)
+import System.IO                       (hPutStrLn, stderr)
+import Control.Exception               (displayException)
 import Core.Instruction          (Extension(..))
 import Generator.Types           (defaultConfig, GeneratorConfig(..))
 import Generator.Seed            (newRandomSeed, seedFromWord64)
@@ -97,12 +99,22 @@ runServer opts = do
   let apiApp     = serve rigAPI (server state)
       staticApp_ = staticApp (defaultWebAppSettings "frontend/dist")
       combined   = combineApps apiApp staticApp_
+      settings   = setPort (soPort opts)
+                 $ setOnOpen  (\_ -> hPutStrLn stderr "OPEN"  >> return True)
+                 $ setOnClose (\_ -> hPutStrLn stderr "CLOSE")
+                 $ setLogger (\req st _ -> hPutStrLn stderr
+                     ("REQ: " <> show (pathInfo req) <> " -> " <> show st))
+                 $ setOnException (\_ ex ->
+                     hPutStrLn stderr ("EX: " <> displayException ex))
+                 $ defaultSettings
   putStrLn ("Pooh-V is ready to hunt on port " <> show (soPort opts))
   putStrLn ("Hunny Pot: http://localhost:" <> show (soPort opts))
-  run (soPort opts) combined
+  runSettings settings combined
 
 combineApps :: Application -> Application -> Application
-combineApps api static_ req respond =
+combineApps api static_ req respond = do
+  hPutStrLn stderr ("DISPATCH: " <> show (pathInfo req))
   case pathInfo req of
     ("api":rest) -> api req { pathInfo = rest } respond
+    []           -> static_ req { pathInfo = ["index.html"] } respond
     _            -> static_ req respond

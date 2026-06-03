@@ -1,6 +1,6 @@
 packages: .
 optimization: 1
 
--- Pin sbv to a version compatible with GHC 9.4 (base 4.17)
 -- sbv >= 10.10 has a GHC.TypeLits SChar issue with GHC < 9.6
-constraints: sbv == 10.2
+-- Upgraded to GHC 9.8.4 (base 4.19) so the pin is removed
+constraints: sbv >= 10.10

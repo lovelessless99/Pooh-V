@@ -1,9 +1,23 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import PrimeVue from 'primevue/config'
+import Aura from '@primevue/themes/aura'
+import ConfirmationService from 'primevue/confirmationservice'
+import 'primeicons/primeicons.css'
 import App from './App.vue'
 import router from './router'
 
-createApp(App)
-  .use(createPinia())
-  .use(router)
-  .mount('#app')
+const app = createApp(App)
+app.use(createPinia())
+app.use(router)
+app.use(PrimeVue, {
+  theme: {
+    preset: Aura,
+    options: {
+      darkModeSelector: '.dark',
+      cssLayer: false
+    }
+  }
+})
+app.use(ConfirmationService)
+app.mount('#app')
